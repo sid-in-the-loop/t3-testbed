@@ -101,7 +101,6 @@ Search results:
 Write a brief structured summary (max {max_tokens} tokens worth of text):
 - What I found: [key facts from search results]
 - What's missing: [what the search didn't reveal]
-- Best partial answer: [your best guess at the answer based on findings so far, or "unknown"]
 """
 
 PARENT_PROMPT = """\

@@ -4,7 +4,7 @@ T³ Fixed — Test-Time Threading with hand-crafted diversity seeds.
 Design:
   k parallel threads, each with a distinct seed strategy.
   n turns. Each turn:
-    1. Parent generates k seed prompts (diversity enforced by strategy).
+    1. Parent's global state is shared with threads.
     2. k threads run in parallel: each issues 1 search, produces a summary.
     3. Parent synthesizes all k summaries, outputs <answer> or continues.
 
@@ -15,6 +15,15 @@ Diversity seeds (T³ Fixed, hand-crafted):
 Extensibility:
   - T³ Dynamic: replace _generate_seeds() with an LLM call
   - T³ DPP: replace _generate_seeds() with DPP-based candidate selection
+
+Fixes applied:
+  - Removed "extremely concise (1-5 words)" instruction (kills EM on multi-part/long GT answers)
+  - Added language-matching instruction (dataset is 64% Chinese)
+  - Fixed PARENT_FORCE_PROMPT: removed literal <answer>YOUR ANSWER HERE</answer> which caused
+    extract_answer() to return "YOUR ANSWER HERE" as the final answer
+  - Robust global state extraction: multiple parsing strategies + graceful fallback
+  - Summary token budget: max(256, t*0.75) instead of t//2 to preserve more signal
+  - Parent context cap: limit accumulated summaries to avoid context explosion at k=16
 """
 
 import asyncio
@@ -28,8 +37,6 @@ from .base import BaseMethod, MethodResult, TurnLog, extract_answer
 
 
 # ── Fixed Diversity Seed Pool ─────────────────────────────────────────────────
-# Each seed is a string that describes a search strategy.
-# They're injected into the thread prompt to steer it toward a distinct region.
 
 SEED_POOL = [
     # Direct entity lookup
@@ -37,70 +44,73 @@ SEED_POOL = [
     # Alternative phrasing / aliases
     "Search using alternative names, acronyms, or synonyms for the key entities in the question.",
     # Contextual / relational
-    "Search for context around the question: related events, people, or places that connect to the answer.",
+    "Search for context: related events, people, or organizations that connect to the answer.",
     # Temporal / historical
     "Search with a focus on dates, timelines, and historical facts related to the question.",
-    # Source-based
-    "Search Wikipedia, official records, or authoritative sources for definitive facts.",
-    # Decomposition
-    "Break the question into sub-questions and search for each part separately.",
-    # Contrastive
-    "Search for what the answer is NOT, then narrow down to the correct answer.",
+    # Source-based (Wikipedia / official)
+    "Search Wikipedia or official organizational sources for definitive facts.",
+    # Decomposition — first sub-question
+    "Identify the first unknown in the question and search specifically for that.",
+    # Decomposition — second sub-question
+    "Identify the second unknown in the question (if any) and search specifically for that.",
     # Cross-reference
-    "Search for two or more independent facts that together uniquely identify the answer.",
+    "Search for two independent facts that together uniquely identify the answer.",
     # Numeric / statistical
-    "Search for numbers, statistics, rankings, or measurements related to the question.",
+    "Search for numbers, counts, dates, or rankings relevant to the question.",
     # Geographic / institutional
-    "Search for geographic locations, organizations, or institutions central to the question.",
-    # Recent / updated
-    "Search for the most recent or updated information about the subject of the question.",
-    # Broad background
-    "Search for background information to understand the topic before narrowing to the specific answer.",
+    "Search for geographic locations or institutions central to the question.",
+    # Recent / updated information
+    "Search for the most recent or updated information about the subject.",
     # Primary source
-    "Search for primary sources: official websites, government records, academic papers.",
-    # Common knowledge verification
-    "Start from well-known facts about this topic and verify or refine the specific answer.",
-    # Citation-based
-    "Search for articles or pages that explicitly cite the answer as a known fact.",
+    "Search for primary sources: official websites, papers, or press releases.",
     # Entity disambiguation
-    "If the question is ambiguous, identify all possible interpretations and search for each.",
+    "If the question involves an ambiguous entity, search for its full context to disambiguate.",
+    # Background sweep
+    "Search broadly for background on the main topic, then narrow to the specific fact.",
+    # Citation-based
+    "Search for pages that explicitly state the answer as a known cited fact.",
+    # Verification
+    "Search to verify or disprove the most likely candidate answer you can infer from context.",
 ]
 
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
 
 THREAD_SYSTEM = """\
-You are a focused search thread. Your job is to find information relevant to a question
-using ONE specific search query. Be concise and precise.
+You are a focused search agent. Your job: generate ONE search query that explores a \
+specific angle of the question, then summarize what you find.
+Respond in the SAME LANGUAGE as the question.
 """
 
 THREAD_PROMPT = """\
 Question: {question}
 
-CURRENT GLOBAL STATE:
+GLOBAL STATE (what is already known and already searched):
 {global_state}
 
 Your search strategy: {seed}
 
-Task:
-1. Generate ONE specific search query that follows your strategy AND addresses what is still missing.
-2. DO NOT repeat queries that have already been tried (see "Queries Tried" in Global State).
-3. Be as specific as possible to avoid broad, redundant results.
+Instructions:
+1. Generate ONE specific search query that follows your strategy AND fills a gap in the Global State.
+2. DO NOT repeat queries already listed in "Queries Tried".
+3. Be specific to avoid broad, redundant results.
 
-Write your search query exactly as:
-SEARCH: <your query here>
+Write your query as:
+SEARCH: <query here>
 """
 
 THREAD_SUMMARY_PROMPT = """\
 Question: {question}
-You searched for: {query}
+Search query used: {query}
 Search results:
 {search_results}
 
-Write a brief structured summary (max {max_tokens} tokens):
-- What I found: [list key facts discovered from THIS search]
-- What's missing: [be specific about what is still unknown or ambiguous]
-- Best partial answer: [concise guess or "unknown"]
+Write a brief structured summary:
+- What I found: [specific facts from this search]
+- What's missing: [what this search did NOT reveal]
+- Best partial answer: [your best guess at the answer, or "unknown"]
+
+Respond in the SAME LANGUAGE as the question. Be concise but complete.
 """
 
 PARENT_PROMPT = """\
@@ -109,66 +119,71 @@ Question: {question}
 CURRENT GLOBAL STATE:
 {global_state}
 
-NEW FINDINGS FROM {k} PARALLEL THREADS (Turn {turn}/{n_turns}):
+NEW FINDINGS — Turn {turn}/{n_turns} ({k} threads):
 {current_summaries}
 
-Task:
-1. Update the GLOBAL STATE by merging the new findings into "Facts Found" and "Queries Tried".
-2. If the question can be answered from "Facts Found", output the answer between <answer> and </answer> tags.
-3. If not, provide "COORDINATOR GUIDANCE" for the next turn.
+Tasks:
+1. Merge the new findings into the Global State.
+2. If you can now answer the question fully, output the answer using the tag below.
+3. If not, write brief COORDINATOR GUIDANCE for what to search next.
 
-The answer must be extremely concise (1-5 words, e.g., a name, date, or fact) without conversational filler.
+Answer in the SAME LANGUAGE as the question. Provide a COMPLETE answer covering ALL parts of the question.
 
-Respond in this exact format:
+Reply in this format:
 UPDATED GLOBAL STATE:
-- Facts Found: [distilled bullet points of all known facts]
-- Queries Tried: [list of all search terms used so far]
-- Missing Info: [specific details still needed]
+- Facts Found: [all confirmed facts so far]
+- Queries Tried: [all queries used so far, comma-separated]
+- Missing Info: [what is still unknown]
 
-COORDINATOR GUIDANCE: [specific instructions for next turn] (OR <answer>YOUR ANSWER HERE</answer>)
+COORDINATOR GUIDANCE: [what to search next turn] OR <answer>COMPLETE ANSWER HERE</answer>
 """
 
+# FIXED: no longer contains literal <answer>YOUR ANSWER HERE</answer> which
+# caused extract_answer() to return "YOUR ANSWER HERE" as the final answer.
 PARENT_FORCE_PROMPT = """\
 Question: {question}
 
 FINAL GLOBAL STATE:
 {global_state}
 
-NEW FINDINGS FROM FINAL TURN:
+FINAL TURN FINDINGS:
 {current_summaries}
 
-This is the FINAL turn. You MUST provide a final answer now based on all findings.
-<answer>YOUR ANSWER HERE</answer>
+This is the last turn. Based on ALL findings, write the best possible answer.
+Answer in the SAME LANGUAGE as the question. Cover ALL parts the question asks about.
 
-Important: The answer must be extremely concise (1-5 words).
+Wrap your final answer in answer tags. Replace [ANSWER] with the actual answer:
+<answer>[ANSWER]</answer>
 """
+
+# Cap total accumulated summary text sent to parent (avoids context explosion at k=16)
+_MAX_PARENT_CONTEXT_CHARS = 8000
 
 
 class T3FixedMethod(BaseMethod):
     """
     T³ Fixed: k parallel threads per turn, hand-crafted diversity seeds.
 
-    Architecture per turn:
-      [Parent] generates seed contexts for k threads
-      [Thread 1..k] (parallel): 1 search + summary
-      [Parent] synthesizes → answer or continue
+    Per turn:
+      Threads run in parallel → each produces 1 search + summary.
+      Parent sees global state + new summaries → updates state or answers.
 
     Extensibility hook:
       Override _generate_seeds() for T³ Dynamic or T³ DPP.
     """
 
-    def _generate_seeds(self, question: str, k: int, prior_context: str = "") -> list[str]:
-        """
-        Return k diversity seed strings for the threads.
+    @property
+    def _summary_tokens(self) -> int:
+        """Summary token budget: generous enough to capture multi-part answers."""
+        return max(256, int(self.config.t * 0.75))
 
-        T³ Fixed: selects k seeds from SEED_POOL in order.
-        T³ Dynamic would call an LLM here.
-        T³ DPP would run a DPP selector here.
+    def _generate_seeds(self, question: str, k: int, global_state: str = "") -> list[str]:
         """
-        seeds = []
-        for i in range(k):
-            seeds.append(SEED_POOL[i % len(SEED_POOL)])
-        return seeds
+        Return k diversity seed strings.
+        T³ Fixed: round-robin from SEED_POOL.
+        Override for T³ Dynamic / T³ DPP.
+        """
+        return [SEED_POOL[i % len(SEED_POOL)] for i in range(k)]
 
     async def _run_thread(
         self,
@@ -178,12 +193,10 @@ class T3FixedMethod(BaseMethod):
         global_state: str,
     ) -> tuple[str, str, str]:
         """
-        Run one thread: generate query → search → summarize.
-
-        Returns:
-            (query, search_result, summary)
+        One thread: generate query → search → summarize.
+        Returns (query, search_result, summary).
         """
-        # Step 1: Generate search query
+        # Step 1: Generate query
         query_messages = [
             {"role": "system", "content": THREAD_SYSTEM},
             {"role": "user", "content": THREAD_PROMPT.format(
@@ -195,42 +208,39 @@ class T3FixedMethod(BaseMethod):
         query_response, _, _ = await call_llm(
             messages=query_messages,
             model=self.model,
-            max_tokens=min(200, self.config.t // 4),  # Small budget for query generation
-            temperature=0.8,  # Slightly higher for diversity
-            seed=None,
+            max_tokens=min(150, self.config.t // 4),
+            temperature=0.8,
         )
 
-        # Extract SEARCH: query
-        query = _extract_search_query(query_response) or f"{question} (thread {thread_idx})"
+        query = _extract_search_query(query_response) or f"{question[:80]} {seed[:30]}"
 
-        # Step 2: Execute search
-        search_result = web_search(query)
+        # Step 2: Search
+        search_result = web_search(query, max_chars=2500)
 
-        # Step 3: Summarize findings
+        # Step 3: Summarize
         summary_messages = [
             {"role": "system", "content": THREAD_SYSTEM},
             {"role": "user", "content": THREAD_SUMMARY_PROMPT.format(
                 question=question,
                 query=query,
-                search_results=search_result[:2000],  # Truncate for token budget
-                max_tokens=self.config.summary_tokens,
+                search_results=search_result[:2000],
             )},
         ]
         summary, _, _ = await call_llm(
             messages=summary_messages,
             model=self.model,
-            max_tokens=self.config.summary_tokens,
+            max_tokens=self._summary_tokens,
             temperature=0.3,
         )
 
         return query, search_result, summary
 
     async def run_question(
-        self, 
-        question_id: str, 
-        question: str, 
+        self,
+        question_id: str,
+        question: str,
         answer_gt: str,
-        pbar: Optional[any] = None,
+        pbar: Optional[object] = None,
     ) -> MethodResult:
         result = MethodResult(
             question_id=question_id,
@@ -242,29 +252,31 @@ class T3FixedMethod(BaseMethod):
         )
 
         k = self.config.k
-        global_state = "- Facts Found: None\n- Queries Tried: None\n- Missing Info: All details"
+        global_state = (
+            "- Facts Found: None\n"
+            "- Queries Tried: None\n"
+            "- Missing Info: All details needed to answer the question"
+        )
         final_answer: Optional[str] = None
         total_search_calls = 0
+        all_summaries_for_parent: list[str] = []  # Accumulated across turns
 
         for turn in range(1, self.config.n + 1):
             if pbar:
-                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (threads running...)")
+                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (threads)")
             is_last_turn = (turn == self.config.n)
             turn_log = TurnLog(turn=turn)
 
-            # Generate k diverse seed strategies
+            # Generate seeds and run k threads in parallel
             seeds = self._generate_seeds(question, k, global_state)
-
-            # Run k threads in parallel
-            self._log(f"Turn {turn}: spawning {k} threads")
             thread_tasks = [
                 self._run_thread(i, question, seeds[i], global_state)
                 for i in range(k)
             ]
-            
             thread_outputs = await asyncio.gather(*thread_tasks)
+
             if pbar:
-                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (synthesizing...)")
+                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (parent)")
                 pbar.update(1)
 
             queries, search_results, summaries = zip(*thread_outputs)
@@ -273,24 +285,32 @@ class T3FixedMethod(BaseMethod):
             turn_log.thread_summaries = list(summaries)
             total_search_calls += k
 
-            # Build current summaries block
+            # Build current summaries block for parent
             current_summaries = "\n\n".join(
-                f"[Thread {i+1} | {seeds[i][:40]}...]\n{summaries[i]}"
+                f"[Thread {i+1} | {seeds[i][:50]}]\n{summaries[i]}"
                 for i in range(k)
             )
+
+            # Accumulate for parent context; cap total to avoid explosion at k=16
+            all_summaries_for_parent.append(f"=== Turn {turn} ===\n{current_summaries}")
+            accumulated = "\n\n".join(all_summaries_for_parent)
+            if len(accumulated) > _MAX_PARENT_CONTEXT_CHARS:
+                # Keep only the most recent turns when context gets too large
+                accumulated = "\n\n".join(all_summaries_for_parent[-2:])
+                accumulated = "[Earlier turns omitted for brevity]\n\n" + accumulated
 
             # Parent synthesis
             if is_last_turn:
                 parent_content = PARENT_FORCE_PROMPT.format(
                     question=question,
                     global_state=global_state,
-                    current_summaries=current_summaries,
+                    current_summaries=accumulated,
                 )
             else:
                 parent_content = PARENT_PROMPT.format(
                     question=question,
                     global_state=global_state,
-                    current_summaries=current_summaries,
+                    current_summaries=current_summaries,  # Only current turn (state handles history)
                     k=k,
                     turn=turn,
                     n_turns=self.config.n,
@@ -307,29 +327,34 @@ class T3FixedMethod(BaseMethod):
             turn_log.prompt_tokens = p_tokens
             turn_log.output_tokens = o_tokens
 
-            self._log(f"Turn {turn}: parent response ({o_tokens} tokens)")
+            self._log(f"Turn {turn}: parent ({o_tokens} tokens)")
 
-            # Check if parent found an answer
+            # Check for answer
             answer = extract_answer(parent_response)
             if answer:
                 final_answer = answer
                 turn_log.answer_found = True
                 result.turns.append(turn_log)
-                self._log(f"Turn {turn}: answer found: '{answer[:60]}'")
+                self._log(f"Turn {turn}: answer='{answer[:80]}'")
                 break
 
-            # Update global state for next turn
+            # Update global state for next turn — robust extraction with fallback
             new_state = _extract_global_state(parent_response)
             if new_state:
                 global_state = new_state
+            else:
+                # Fallback: append new queries to existing state so they're not repeated
+                new_queries = ", ".join(queries)
+                global_state = _append_queries_to_state(global_state, new_queries)
 
             result.turns.append(turn_log)
 
-        # Fallback: extract from last parent response
+        # Fallback answer extraction
         if final_answer is None and result.turns:
-            last_parent = result.turns[-1].parent_response
-            final_answer = extract_answer(last_parent) or _extract_fallback_from_summaries(
-                result.turns[-1].thread_summaries
+            last = result.turns[-1]
+            final_answer = (
+                extract_answer(last.parent_response)
+                or _extract_fallback_from_summaries(last.thread_summaries)
             )
 
         result.final_answer = final_answer or ""
@@ -343,18 +368,44 @@ class T3FixedMethod(BaseMethod):
         return result
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
 def _extract_global_state(text: str) -> Optional[str]:
-    """Extract UPDATED GLOBAL STATE from parent response."""
-    if "UPDATED GLOBAL STATE:" in text:
-        parts = text.split("UPDATED GLOBAL STATE:")
-        if len(parts) > 1:
-            state = parts[1].split("COORDINATOR GUIDANCE:")[0].strip()
-            return state
+    """
+    Extract UPDATED GLOBAL STATE from parent response.
+    Tries multiple delimiters for robustness.
+    """
+    # Primary: look for "UPDATED GLOBAL STATE:" header
+    for header in ("UPDATED GLOBAL STATE:", "GLOBAL STATE:", "Updated Global State:"):
+        if header in text:
+            after = text.split(header, 1)[1]
+            # Trim at known end-markers
+            for end_marker in ("COORDINATOR GUIDANCE:", "<answer>", "==="):
+                if end_marker in after:
+                    after = after.split(end_marker, 1)[0]
+            state = after.strip()
+            if len(state) > 20:  # Sanity: must have some content
+                return state
     return None
 
 
+def _append_queries_to_state(state: str, new_queries: str) -> str:
+    """Append new queries to Queries Tried line in state (fallback when extraction fails)."""
+    if "Queries Tried:" in state:
+        lines = state.split("\n")
+        for i, line in enumerate(lines):
+            if "Queries Tried:" in line:
+                if "None" in line:
+                    lines[i] = f"- Queries Tried: {new_queries}"
+                else:
+                    lines[i] = line.rstrip() + f", {new_queries}"
+                break
+        return "\n".join(lines)
+    return state + f"\n- Queries Tried (appended): {new_queries}"
+
+
 def _extract_search_query(text: str) -> Optional[str]:
-    """Extract SEARCH: query from model response."""
+    """Extract SEARCH: query from thread response."""
     m = re.search(r"SEARCH:\s*(.+?)(?:\n|$)", text, re.IGNORECASE)
     if m:
         return m.group(1).strip()
@@ -362,9 +413,8 @@ def _extract_search_query(text: str) -> Optional[str]:
 
 
 def _extract_fallback_from_summaries(summaries: list[str]) -> Optional[str]:
-    """Try to extract a best-guess answer from thread summaries."""
+    """Pull best partial answer from thread summaries when parent didn't use <answer>."""
     for summary in summaries:
-        # Look for "Best partial answer:" line
         m = re.search(r"Best partial answer:\s*(.+?)(?:\n|$)", summary, re.IGNORECASE)
         if m:
             answer = m.group(1).strip()

@@ -15,6 +15,12 @@ Token budget:
 Search constraint:
   We allow unlimited search calls per turn but track the count.
   (In theory bounded by t/avg_turn_cost, matching the compute budget.)
+
+Fixes applied:
+  - Removed "extremely concise (1-5 words)" instruction (kills EM on multi-part/long GT answers)
+  - Added language-matching instruction (dataset is 64% Chinese; model must answer in question's language)
+  - History compression: only key facts are appended (not raw reasoning+search dumps),
+    preventing context explosion at high t budgets
 """
 
 import re
@@ -32,19 +38,20 @@ from .base import BaseMethod, MethodResult, TurnLog, extract_answer
 SYSTEM_PROMPT = """\
 You are a research assistant that answers questions by searching the web.
 
-You have {n_turns} turns to find the answer. Use them wisely.
+You have {n_turns} turns to find the answer.
 
-At each turn, reason about what you know and what you still need to find.
-Then search for missing information. You may search multiple times per turn.
+At each turn, reason about what you know and what you still need to find, \
+then search for missing information. You may search multiple times per turn.
 
 When you are confident in the answer, output it as:
 <answer>YOUR ANSWER HERE</answer>
 
 Guidelines:
-- Your final answer must be extremely concise and to the point (e.g., a name, date, or specific fact) without conversational filler.
+- Answer in the SAME LANGUAGE as the question.
+- Provide a complete answer that addresses ALL parts of the question.
+- Match the level of detail the question requires (a date, a name, a sentence, a list, etc.).
+- Do NOT repeat searches you have already done. Diversify your queries each turn.
 - If you cannot find the answer after all turns, give your best guess.
-- Do NOT repeat searches you've already done.
-- Build on findings from previous turns.
 """
 
 TURN_PROMPT = """\
@@ -52,54 +59,57 @@ Turn {turn}/{n_turns}
 
 Question: {question}
 
+KNOWN FACTS SO FAR:
 {history}
 
-What do you know so far? What do you still need to find?
-Reason step by step, then decide whether to search or answer.
+What is still unknown? Decide: search for more information or provide a final answer.
 
-If you want to search, write:
-SEARCH: <your query here>
+To search, write on its own line:
+SEARCH: <specific query here>
 
-You may search multiple times. When done searching, write:
-<answer>YOUR ANSWER HERE</answer>
-
-If this is your final turn, you MUST provide an answer.
+You may search multiple times this turn. When you have enough information, write:
+<answer>YOUR COMPLETE ANSWER HERE</answer>
 """
 
 FORCE_ANSWER_PROMPT = """\
-This is your FINAL turn. You MUST provide an answer now.
+FINAL TURN — you MUST provide an answer now.
 
 Question: {question}
 
-Based on everything you've found so far:
+KNOWN FACTS:
 {history}
 
-Provide your best answer in the format:
-<answer>YOUR ANSWER HERE</answer>
+Based on everything found, write your best answer:
+<answer>YOUR COMPLETE ANSWER HERE</answer>
 
-The answer must be extremely concise and to the point.
+Answer in the same language as the question. Cover all parts the question asks about.
 """
 
-SEARCH_PATTERN = re.compile(r"SEARCH:\s*(.+?)(?=\n|SEARCH:|<answer>|$)", re.IGNORECASE)
+# Compress search results to just the most relevant content
+_MAX_SEARCH_CHARS = 2000
+SEARCH_PATTERN = re.compile(r"SEARCH:\s*(.+?)(?=\nSEARCH:|\n<answer>|<answer>|$)", re.IGNORECASE | re.DOTALL)
 
 
 class S1Method(BaseMethod):
     """
     Sequential scaling: single thread, growing token budget per turn.
 
-    Implements a simple ReAct-style loop:
-      1. Prompt model with question + history
+    Implements a ReAct-style loop:
+      1. Prompt model with question + compressed knowledge history
       2. Model reasons and issues SEARCH: queries
-      3. Execute searches, append results to history
+      3. Execute searches, distil key facts into history
       4. Repeat until <answer> found or n turns exhausted
+
+    Key design: history contains only distilled facts (not raw model reasoning
+    or full search dumps) so context stays manageable at high token budgets.
     """
 
     async def run_question(
-        self, 
-        question_id: str, 
-        question: str, 
+        self,
+        question_id: str,
+        question: str,
         answer_gt: str,
-        pbar: Optional[any] = None,
+        pbar: Optional[object] = None,
     ) -> MethodResult:
         result = MethodResult(
             question_id=question_id,
@@ -110,7 +120,8 @@ class S1Method(BaseMethod):
             config_id=self.config.id,
         )
 
-        history_parts: list[str] = []  # Accumulated search findings
+        # history_parts accumulates distilled facts (not raw outputs)
+        history_parts: list[str] = []
         final_answer: Optional[str] = None
         total_search_calls = 0
 
@@ -118,12 +129,12 @@ class S1Method(BaseMethod):
             if pbar:
                 pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n}")
                 pbar.update(1)
+
             is_last_turn = (turn == self.config.n)
             turn_log = TurnLog(turn=turn)
 
-            history_str = "\n\n".join(history_parts) if history_parts else "No findings yet."
+            history_str = "\n".join(history_parts) if history_parts else "None yet."
 
-            # Build prompt
             if is_last_turn and final_answer is None:
                 user_content = FORCE_ANSWER_PROMPT.format(
                     question=question,
@@ -142,7 +153,6 @@ class S1Method(BaseMethod):
                 {"role": "user", "content": user_content},
             ]
 
-            # LLM call with token budget t
             response_text, p_tokens, o_tokens = await call_llm(
                 messages=messages,
                 model=self.model,
@@ -155,42 +165,43 @@ class S1Method(BaseMethod):
 
             self._log(f"Turn {turn}: {o_tokens} output tokens")
 
-            # Check if model provided an answer
+            # Check for answer first
             answer = extract_answer(response_text)
             if answer:
                 final_answer = answer
                 turn_log.answer_found = True
                 result.turns.append(turn_log)
-                self._log(f"Turn {turn}: answer found: '{answer[:60]}'")
+                self._log(f"Turn {turn}: answer found: '{answer[:80]}'")
                 break
 
             # Extract and execute search queries
-            queries = SEARCH_PATTERN.findall(response_text)
-            queries = [q.strip() for q in queries if q.strip()]
+            raw_queries = SEARCH_PATTERN.findall(response_text)
+            queries = [q.strip().splitlines()[0].strip() for q in raw_queries if q.strip()]
             turn_log.search_queries = queries
 
             if queries:
-                search_results = []
+                # Run all searches for this turn, collect results
+                search_snippets = []
                 for query in queries:
                     self._log(f"Turn {turn}: searching '{query}'")
-                    sr = web_search(query)
+                    sr = web_search(query, max_chars=_MAX_SEARCH_CHARS)
                     total_search_calls += 1
-                    search_results.append(f"Query: {query}\n{sr}")
+                    search_snippets.append(f"• [{query}]: {sr[:600]}")
 
-                # Append to history (including BOTH reasoning and search results)
-                turn_summary = f"[Turn {turn} reasoning]\n{response_text}\n\n[Turn {turn} searches]\n" + "\n---\n".join(search_results)
+                # Append ONLY the distilled search results to history (not raw reasoning).
+                # This keeps context size proportional to search results, not token budget.
+                turn_summary = f"[Turn {turn}]\n" + "\n".join(search_snippets)
                 history_parts.append(turn_summary)
-                turn_log.search_queries = queries
             else:
-                # Model didn't search or answer — extract partial answer if any
-                history_parts.append(f"[Turn {turn} reasoning]\n{response_text}")
+                # No search issued — record any reasoning insight briefly
+                insight = response_text.strip()[:300]
+                history_parts.append(f"[Turn {turn} note] {insight}")
 
             result.turns.append(turn_log)
 
-        # If no answer found after all turns, try to extract from last response
+        # Fallback: extract from last response if no <answer> tag was found
         if final_answer is None and result.turns:
             last_reasoning = result.turns[-1].reasoning
-            # Try to find any answer-like content
             final_answer = extract_answer(last_reasoning) or _extract_fallback_answer(last_reasoning)
 
         result.final_answer = final_answer or ""
@@ -205,15 +216,10 @@ class S1Method(BaseMethod):
 
 
 def _extract_fallback_answer(text: str) -> Optional[str]:
-    """
-    Fallback: try to find a short answer in the last paragraph.
-    Used when the model didn't use <answer> tags.
-    """
+    """Last-resort: take the last substantive line if model skipped <answer> tags."""
     lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
-    if not lines:
-        return None
-    # Heuristic: last non-empty line that looks like a short answer
     for line in reversed(lines):
-        if len(line) < 200 and not line.startswith(("SEARCH:", "Query:", "Turn", "Based")):
+        skip_prefixes = ("SEARCH:", "Query:", "Turn ", "Based on", "I need", "Let me")
+        if len(line) < 500 and not any(line.startswith(p) for p in skip_prefixes):
             return line
-    return lines[-1][:200] if lines else None
+    return lines[-1][:400] if lines else None

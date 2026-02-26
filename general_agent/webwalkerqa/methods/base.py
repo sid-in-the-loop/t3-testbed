@@ -89,14 +89,22 @@ class MethodResult:
         }
 
 
+_PLACEHOLDER_ANSWERS = {"[answer]", "your answer here", "your complete answer here",
+                        "write your complete answer here", "[your actual answer]", "[answer]"}
+
+
 def extract_answer(text: str) -> Optional[str]:
     """
     Extract answer from <answer>...</answer> tags.
-    Returns None if no tag found.
+    Returns None if no tag found or if the content is a placeholder string
+    (guards against prompt templates that contain literal example tags).
     """
     match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL | re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        answer = match.group(1).strip()
+        if answer.lower() in _PLACEHOLDER_ANSWERS:
+            return None
+        return answer
     return None
 
 

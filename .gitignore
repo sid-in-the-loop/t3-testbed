@@ -205,6 +205,12 @@ general_agent/*
 !general_agent/requirements.txt
 !general_agent/environment.yml
 !general_agent/setup.sh
+# Keep WebWalkerQA T³ PoC module
+!general_agent/webwalkerqa/
+!general_agent/webwalkerqa/**
+# Re-exclude pycache within webwalkerqa (negation above would un-ignore it)
+general_agent/webwalkerqa/**/__pycache__/
+general_agent/webwalkerqa/__pycache__/
 # Keep specific data files (benchmark tasks)
 !general_agent/data/
 !general_agent/data/mathhay_benchmark.json

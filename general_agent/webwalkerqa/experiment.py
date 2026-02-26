@@ -34,10 +34,12 @@ if str(_GA_DIR) not in sys.path:
 from dotenv import load_dotenv
 load_dotenv(_GA_DIR / ".env")
 
+from tqdm import tqdm
 from webwalkerqa.configs import EXPERIMENT_MATRIX, list_configs, get_config
 from webwalkerqa.dataset import load_dataset
-from webwalkerqa.eval import compute_em_score
+from webwalkerqa.eval import compute_scores
 from webwalkerqa.runner import run_question
+from webwalkerqa.methods.base import MethodResult
 
 
 DEFAULT_MODEL = "openai/gpt-4o-mini"
@@ -89,33 +91,65 @@ async def run_experiment(
     # Run questions with concurrency control
     semaphore = asyncio.Semaphore(max_concurrent)
     results = []
+    
+    # Track active progress bars to assign positions
+    # Position 0 is main bar, positions 1 to max_concurrent are for questions
+    available_positions = list(range(1, max_concurrent + 1))
+    pos_lock = asyncio.Lock()
 
     async def run_one(example):
-        async with semaphore:
-            return await run_question(
-                example=example,
-                config=config,
-                model=model,
-                output_dir=output_dir,
-                verbose=verbose,
+        try:
+            async with semaphore:
+                async with pos_lock:
+                    pos = available_positions.pop(0)
+                
+                # Create a progress bar for this question
+                q_pbar = tqdm(
+                    total=config.n if config.method != "oracle" else 8, 
+                    desc=f"Q {example.id}: Starting", 
+                    position=pos, 
+                    leave=False
+                )
+                
+                try:
+                    res = await run_question(
+                        example=example,
+                        config=config,
+                        model=model,
+                        output_dir=output_dir,
+                        verbose=verbose,
+                        pbar=q_pbar,
+                    )
+                    return res
+                finally:
+                    q_pbar.close()
+                    async with pos_lock:
+                        available_positions.append(pos)
+                        available_positions.sort()
+        except Exception as e:
+            # Ensure we return a failed result instead of crashing the whole experiment
+            return MethodResult(
+                question_id=example.id,
+                question=example.question,
+                answer_gt=str(example.answer),
+                final_answer="",
+                error=str(e)
             )
 
     tasks = [run_one(ex) for ex in examples]
 
     # Process with progress updates
-    completed = 0
-    for coro in asyncio.as_completed(tasks):
+    pbar = tqdm(asyncio.as_completed(tasks), total=len(examples), desc=f"Config {config.id}", position=0)
+    for coro in pbar:
         result = await coro
         results.append(result)
-        completed += 1
-        if completed % 10 == 0 or completed == len(examples):
-            n_correct = sum(1 for r in results if r.em)
-            print(f"  Progress: {completed}/{len(examples)} | EM so far: {n_correct}/{completed} "
-                  f"({100*n_correct/completed:.1f}%)")
+        n_correct = sum(1 for r in results if r.em)
+        avg_f1 = sum(r.f1 if hasattr(r, 'f1') else 0 for r in results) / len(results)
+        pbar.set_postfix({"EM": f"{n_correct/len(results):.2f}", "F1": f"{avg_f1:.2f}"})
 
     # Compute summary
     result_dicts = [r.to_dict() for r in results]
-    em_stats = compute_em_score(result_dicts)
+    scores = compute_scores(result_dicts)
 
     summary = {
         "config_id": config.id,
@@ -126,7 +160,7 @@ async def run_experiment(
         "model": model,
         "timestamp": timestamp,
         "num_questions": len(examples),
-        **em_stats,
+        **scores,
         "avg_turns_used": sum(r.turns_used for r in results) / len(results) if results else 0,
         "avg_search_calls": sum(r.search_calls_used for r in results) / len(results) if results else 0,
         "total_prompt_tokens": sum(r.total_prompt_tokens for r in results),
@@ -142,7 +176,8 @@ async def run_experiment(
 
     print(f"\n{'='*60}")
     print(f"RESULT — {config.id} ({config.description})")
-    print(f"  EM:            {em_stats['em']:.4f} ({em_stats['num_correct']}/{em_stats['num_total']})")
+    print(f"  EM:            {scores['em']:.4f} ({scores['num_correct']}/{scores['num_total']})")
+    print(f"  F1:            {scores['f1']:.4f}")
     print(f"  Avg turns:     {summary['avg_turns_used']:.1f}")
     print(f"  Avg searches:  {summary['avg_search_calls']:.1f}")
     print(f"  Total tokens:  {summary['total_prompt_tokens'] + summary['total_output_tokens']:,}")
@@ -241,12 +276,12 @@ def main():
         print("\n" + "=" * 70)
         print("FINAL COMPARISON")
         print("=" * 70)
-        print(f"{'Config':<10} {'Method':<12} {'k':>4} {'t':>6} {'EM':>8} {'Searches':>10}")
-        print("-" * 70)
+        print(f"{'Config':<10} {'Method':<12} {'k':>4} {'t':>6} {'EM':>8} {'F1':>8} {'Searches':>10}")
+        print("-" * 78)
         for s in all_summaries:
             print(
                 f"{s['config_id']:<10} {s['method']:<12} {s['k']:>4} {s['t']:>6} "
-                f"{s['em']:>8.4f} {s['avg_search_calls']:>10.1f}"
+                f"{s['em']:>8.4f} {s['f1']:>8.4f} {s['avg_search_calls']:>10.1f}"
             )
         print("=" * 70)
 

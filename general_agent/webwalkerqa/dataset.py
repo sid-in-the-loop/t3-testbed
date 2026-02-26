@@ -36,7 +36,7 @@ class QAExample:
 
 def load_dataset(
     path: Optional[str] = None,
-    split: str = "test",
+    split: str = "main",
     max_examples: Optional[int] = None,
     shuffle: bool = False,
     seed: int = 42,
@@ -45,8 +45,8 @@ def load_dataset(
     Load WebWalkerQA dataset.
 
     Args:
-        path: Path to local JSON file. If None, tries DEFAULT_LOCAL_PATH, then HF.
-        split: HuggingFace split to use ("train", "test", "validation").
+        path: Path to local JSON file. If None, tries HF.
+        split: HuggingFace split to use ("main", "silver"). Default "main".
         max_examples: Limit dataset size (useful for debugging).
         shuffle: Shuffle examples before slicing.
         seed: Random seed for shuffling.
@@ -56,10 +56,13 @@ def load_dataset(
     """
     if path is not None:
         examples = _load_from_json(path)
-    elif DEFAULT_LOCAL_PATH.exists():
-        examples = _load_from_json(str(DEFAULT_LOCAL_PATH))
     else:
-        examples = _load_from_hf(split)
+        # Check for split-specific cache
+        cache_path = DEFAULT_LOCAL_PATH.parent / f"webwalkerqa_{split}.json"
+        if cache_path.exists():
+            examples = _load_from_json(str(cache_path))
+        else:
+            examples = _load_from_hf(split)
 
     if shuffle:
         import random
@@ -109,14 +112,15 @@ def _load_from_hf(split: str) -> list[QAExample]:
         examples.append(QAExample(id=qid, question=question, answer=answer))
 
     # Cache locally for next run
-    _save_to_cache(examples)
+    cache_path = DEFAULT_LOCAL_PATH.parent / f"webwalkerqa_{split}.json"
+    _save_to_cache(examples, cache_path)
     return examples
 
 
-def _save_to_cache(examples: list[QAExample]) -> None:
+def _save_to_cache(examples: list[QAExample], cache_path: Path) -> None:
     """Save downloaded examples to local cache."""
-    DEFAULT_LOCAL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
     data = [{"id": e.id, "question": e.question, "answer": e.answer} for e in examples]
-    with open(DEFAULT_LOCAL_PATH, "w", encoding="utf-8") as f:
+    with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
-    print(f"[dataset] Cached {len(examples)} examples to {DEFAULT_LOCAL_PATH}")
+    print(f"[dataset] Cached {len(examples)} examples to {cache_path}")

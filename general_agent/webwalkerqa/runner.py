@@ -17,7 +17,7 @@ from typing import Optional
 
 from .configs import ExperimentConfig
 from .dataset import QAExample
-from .eval import exact_match, pass_at_k
+from .eval import exact_match, pass_at_k, f1_score
 from .methods.base import MethodResult
 from .methods import get_method
 from .methods.s1 import S1Method
@@ -29,6 +29,7 @@ async def run_question(
     model: str,
     output_dir: Path,
     verbose: bool = False,
+    pbar: Optional[any] = None,
 ) -> MethodResult:
     """
     Run a method on one question and save the result to output_dir.
@@ -59,6 +60,7 @@ async def run_question(
                 answer_gt=str(example.answer),
                 final_answer=data.get("final_answer", ""),
                 em=data.get("em", False),
+                f1=data.get("f1", 0.0) or f1_score(data.get("final_answer", ""), str(example.answer)),
                 turns_used=data.get("turns_used", 0),
                 search_calls_used=data.get("search_calls_used", 0),
                 total_prompt_tokens=data.get("total_prompt_tokens", 0),
@@ -71,7 +73,7 @@ async def run_question(
             pass  # Corrupted file — re-run
 
     if config.method == "oracle":
-        result = await _run_oracle(example, config, model, output_dir, verbose)
+        result = await _run_oracle(example, config, model, output_dir, verbose, pbar)
     else:
         method_cls = get_method(config.method)
         method = method_cls(model=model, config=config, verbose=verbose)
@@ -80,6 +82,7 @@ async def run_question(
                 question_id=example.id,
                 question=example.question,
                 answer_gt=str(example.answer),
+                pbar=pbar,
             )
         except Exception as e:
             tb = traceback.format_exc()
@@ -114,6 +117,7 @@ async def _run_oracle(
     model: str,
     output_dir: Path,
     verbose: bool,
+    pbar: Optional[any] = None,
 ) -> MethodResult:
     """
     Oracle: run 8 independent s1 trajectories, pick the one with best EM.
@@ -139,10 +143,22 @@ async def _run_oracle(
             question_id=f"{example.id}_oracle_{run_idx}",
             question=example.question,
             answer_gt=str(example.answer),
+            pbar=None,  # Don't show nested bars for oracle internal runs
         ))
 
+    if pbar:
+        pbar.set_description(f"Q {example.id}: Oracle (0/{n_runs})")
+
     try:
-        trajectories = await asyncio.gather(*tasks)
+        if pbar:
+            trajectories = []
+            for coro in asyncio.as_completed(tasks):
+                res = await coro
+                trajectories.append(res)
+                pbar.set_description(f"Q {example.id}: Oracle ({len(trajectories)}/{n_runs})")
+                pbar.update(1)
+        else:
+            trajectories = await asyncio.gather(*tasks)
     except Exception as e:
         trajectories = []
         print(f"  [ERROR] oracle {example.id}: {e}")
@@ -153,6 +169,9 @@ async def _run_oracle(
 
     # Pick best trajectory (first EM match, or first)
     best = next((r for r in trajectories if r.em), trajectories[0] if trajectories else None)
+    
+    # Best F1 among all trajectories
+    max_f1 = max(r.f1 for r in trajectories) if trajectories else 0.0
 
     if best is None:
         return MethodResult(
@@ -161,6 +180,7 @@ async def _run_oracle(
             answer_gt=str(example.answer),
             final_answer="",
             em=False,
+            f1=0.0,
             method="oracle",
             config_id=config.id,
             error="No trajectories completed",
@@ -173,6 +193,7 @@ async def _run_oracle(
         answer_gt=str(example.answer),
         final_answer=best.final_answer,
         em=oracle_em,  # Oracle EM (did any trajectory match?)
+        f1=max_f1,     # Oracle F1
         turns_used=best.turns_used,
         search_calls_used=sum(r.search_calls_used for r in trajectories),
         total_prompt_tokens=sum(r.total_prompt_tokens for r in trajectories),

@@ -23,7 +23,7 @@ from typing import Optional
 
 from ..llm import call_llm
 from ..search import web_search
-from ..eval import exact_match
+from ..eval import exact_match, f1_score
 from .base import BaseMethod, MethodResult, TurnLog, extract_answer
 
 
@@ -77,15 +77,15 @@ using ONE specific search query. Be concise and precise.
 THREAD_PROMPT = """\
 Question: {question}
 
+CURRENT GLOBAL STATE:
+{global_state}
+
 Your search strategy: {seed}
 
-Previous findings from other threads (if any):
-{prior_context}
-
 Task:
-1. Generate ONE specific search query based on your strategy.
-2. The search will be executed for you.
-3. After seeing the results, write a brief summary.
+1. Generate ONE specific search query that follows your strategy AND addresses what is still missing.
+2. DO NOT repeat queries that have already been tried (see "Queries Tried" in Global State).
+3. Be as specific as possible to avoid broad, redundant results.
 
 Write your search query exactly as:
 SEARCH: <your query here>
@@ -93,42 +93,54 @@ SEARCH: <your query here>
 
 THREAD_SUMMARY_PROMPT = """\
 Question: {question}
-
 You searched for: {query}
 Search results:
 {search_results}
 
-Write a brief structured summary (max {max_tokens} tokens worth of text):
-- What I found: [key facts from search results]
-- What's missing: [what the search didn't reveal]
-- Best partial answer: [your best guess at the answer based on findings so far, or "unknown"]
+Write a brief structured summary (max {max_tokens} tokens):
+- What I found: [list key facts discovered from THIS search]
+- What's missing: [be specific about what is still unknown or ambiguous]
+- Best partial answer: [concise guess or "unknown"]
 """
 
 PARENT_PROMPT = """\
 Question: {question}
 
-You have received findings from {k} parallel search threads (Turn {turn}/{n_turns}):
+CURRENT GLOBAL STATE:
+{global_state}
 
-{summaries}
+NEW FINDINGS FROM {k} PARALLEL THREADS (Turn {turn}/{n_turns}):
+{current_summaries}
 
-Based on these findings:
-1. Do you have enough information to answer the question confidently?
-2. If YES: output <answer>YOUR ANSWER HERE</answer> with a concise, specific answer.
-3. If NO: briefly note what's still missing (this will guide the next round of searches).
+Task:
+1. Update the GLOBAL STATE by merging the new findings into "Facts Found" and "Queries Tried".
+2. If the question can be answered from "Facts Found", output the answer between <answer> and </answer> tags.
+3. If not, provide "COORDINATOR GUIDANCE" for the next turn.
 
-Respond now:
+The answer must be extremely concise (1-5 words, e.g., a name, date, or fact) without conversational filler.
+
+Respond in this exact format:
+UPDATED GLOBAL STATE:
+- Facts Found: [distilled bullet points of all known facts]
+- Queries Tried: [list of all search terms used so far]
+- Missing Info: [specific details still needed]
+
+COORDINATOR GUIDANCE: [specific instructions for next turn] (OR <answer>YOUR ANSWER HERE</answer>)
 """
 
 PARENT_FORCE_PROMPT = """\
 Question: {question}
 
-This is the FINAL turn. All search rounds are complete.
+FINAL GLOBAL STATE:
+{global_state}
 
-Findings from all threads:
-{summaries}
+NEW FINDINGS FROM FINAL TURN:
+{current_summaries}
 
-You MUST provide a final answer now. Based on all findings, give your best answer:
+This is the FINAL turn. You MUST provide a final answer now based on all findings.
 <answer>YOUR ANSWER HERE</answer>
+
+Important: The answer must be extremely concise (1-5 words).
 """
 
 
@@ -163,7 +175,7 @@ class T3FixedMethod(BaseMethod):
         thread_idx: int,
         question: str,
         seed: str,
-        prior_context: str,
+        global_state: str,
     ) -> tuple[str, str, str]:
         """
         Run one thread: generate query → search → summarize.
@@ -177,7 +189,7 @@ class T3FixedMethod(BaseMethod):
             {"role": "user", "content": THREAD_PROMPT.format(
                 question=question,
                 seed=seed,
-                prior_context=prior_context or "None yet.",
+                global_state=global_state,
             )},
         ]
         query_response, _, _ = await call_llm(
@@ -213,7 +225,13 @@ class T3FixedMethod(BaseMethod):
 
         return query, search_result, summary
 
-    async def run_question(self, question_id: str, question: str, answer_gt: str) -> MethodResult:
+    async def run_question(
+        self, 
+        question_id: str, 
+        question: str, 
+        answer_gt: str,
+        pbar: Optional[any] = None,
+    ) -> MethodResult:
         result = MethodResult(
             question_id=question_id,
             question=question,
@@ -224,27 +242,30 @@ class T3FixedMethod(BaseMethod):
         )
 
         k = self.config.k
-        all_summaries: list[str] = []  # Accumulated across turns
+        global_state = "- Facts Found: None\n- Queries Tried: None\n- Missing Info: All details"
         final_answer: Optional[str] = None
         total_search_calls = 0
 
         for turn in range(1, self.config.n + 1):
+            if pbar:
+                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (threads running...)")
             is_last_turn = (turn == self.config.n)
             turn_log = TurnLog(turn=turn)
 
-            # Prior context = all summaries from previous turns
-            prior_context = "\n\n".join(all_summaries) if all_summaries else ""
-
             # Generate k diverse seed strategies
-            seeds = self._generate_seeds(question, k, prior_context)
+            seeds = self._generate_seeds(question, k, global_state)
 
             # Run k threads in parallel
             self._log(f"Turn {turn}: spawning {k} threads")
             thread_tasks = [
-                self._run_thread(i, question, seeds[i], prior_context)
+                self._run_thread(i, question, seeds[i], global_state)
                 for i in range(k)
             ]
+            
             thread_outputs = await asyncio.gather(*thread_tasks)
+            if pbar:
+                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n} (synthesizing...)")
+                pbar.update(1)
 
             queries, search_results, summaries = zip(*thread_outputs)
             turn_log.thread_queries = list(queries)
@@ -252,28 +273,27 @@ class T3FixedMethod(BaseMethod):
             turn_log.thread_summaries = list(summaries)
             total_search_calls += k
 
-            # Append this turn's summaries to accumulator
-            turn_block = f"=== Turn {turn} summaries ===\n" + "\n\n".join(
+            # Build current summaries block
+            current_summaries = "\n\n".join(
                 f"[Thread {i+1} | {seeds[i][:40]}...]\n{summaries[i]}"
                 for i in range(k)
             )
-            all_summaries.append(turn_block)
 
             # Parent synthesis
-            summaries_text = "\n\n".join(all_summaries)
-
             if is_last_turn:
                 parent_content = PARENT_FORCE_PROMPT.format(
                     question=question,
-                    summaries=summaries_text,
+                    global_state=global_state,
+                    current_summaries=current_summaries,
                 )
             else:
                 parent_content = PARENT_PROMPT.format(
                     question=question,
+                    global_state=global_state,
+                    current_summaries=current_summaries,
                     k=k,
                     turn=turn,
                     n_turns=self.config.n,
-                    summaries=summaries_text,
                 )
 
             parent_response, p_tokens, o_tokens = await call_llm(
@@ -298,6 +318,11 @@ class T3FixedMethod(BaseMethod):
                 self._log(f"Turn {turn}: answer found: '{answer[:60]}'")
                 break
 
+            # Update global state for next turn
+            new_state = _extract_global_state(parent_response)
+            if new_state:
+                global_state = new_state
+
             result.turns.append(turn_log)
 
         # Fallback: extract from last parent response
@@ -313,8 +338,19 @@ class T3FixedMethod(BaseMethod):
         result.total_prompt_tokens = sum(t.prompt_tokens for t in result.turns)
         result.total_output_tokens = sum(t.output_tokens for t in result.turns)
         result.em = exact_match(result.final_answer, answer_gt)
+        result.f1 = f1_score(result.final_answer, answer_gt)
 
         return result
+
+
+def _extract_global_state(text: str) -> Optional[str]:
+    """Extract UPDATED GLOBAL STATE from parent response."""
+    if "UPDATED GLOBAL STATE:" in text:
+        parts = text.split("UPDATED GLOBAL STATE:")
+        if len(parts) > 1:
+            state = parts[1].split("COORDINATOR GUIDANCE:")[0].strip()
+            return state
+    return None
 
 
 def _extract_search_query(text: str) -> Optional[str]:

@@ -23,7 +23,7 @@ from typing import Optional
 
 from ..llm import call_llm
 from ..search import web_search
-from ..eval import exact_match
+from ..eval import exact_match, f1_score
 from .base import BaseMethod, MethodResult, TurnLog, extract_answer
 
 
@@ -41,10 +41,10 @@ When you are confident in the answer, output it as:
 <answer>YOUR ANSWER HERE</answer>
 
 Guidelines:
-- Be specific and concise in your final answer (a name, date, place, number, etc.)
-- If you cannot find the answer after all turns, give your best guess
-- Do NOT repeat searches you've already done
-- Build on findings from previous turns
+- Your final answer must be extremely concise and to the point (e.g., a name, date, or specific fact) without conversational filler.
+- If you cannot find the answer after all turns, give your best guess.
+- Do NOT repeat searches you've already done.
+- Build on findings from previous turns.
 """
 
 TURN_PROMPT = """\
@@ -76,6 +76,8 @@ Based on everything you've found so far:
 
 Provide your best answer in the format:
 <answer>YOUR ANSWER HERE</answer>
+
+The answer must be extremely concise and to the point.
 """
 
 SEARCH_PATTERN = re.compile(r"SEARCH:\s*(.+?)(?=\n|SEARCH:|<answer>|$)", re.IGNORECASE)
@@ -92,7 +94,13 @@ class S1Method(BaseMethod):
       4. Repeat until <answer> found or n turns exhausted
     """
 
-    async def run_question(self, question_id: str, question: str, answer_gt: str) -> MethodResult:
+    async def run_question(
+        self, 
+        question_id: str, 
+        question: str, 
+        answer_gt: str,
+        pbar: Optional[any] = None,
+    ) -> MethodResult:
         result = MethodResult(
             question_id=question_id,
             question=question,
@@ -107,6 +115,9 @@ class S1Method(BaseMethod):
         total_search_calls = 0
 
         for turn in range(1, self.config.n + 1):
+            if pbar:
+                pbar.set_description(f"Q {question_id}: Turn {turn}/{self.config.n}")
+                pbar.update(1)
             is_last_turn = (turn == self.config.n)
             turn_log = TurnLog(turn=turn)
 
@@ -166,13 +177,13 @@ class S1Method(BaseMethod):
                     total_search_calls += 1
                     search_results.append(f"Query: {query}\n{sr}")
 
-                # Append to history
-                turn_summary = f"[Turn {turn} searches]\n" + "\n---\n".join(search_results)
+                # Append to history (including BOTH reasoning and search results)
+                turn_summary = f"[Turn {turn} reasoning]\n{response_text}\n\n[Turn {turn} searches]\n" + "\n---\n".join(search_results)
                 history_parts.append(turn_summary)
                 turn_log.search_queries = queries
             else:
                 # Model didn't search or answer — extract partial answer if any
-                history_parts.append(f"[Turn {turn} reasoning]\n{response_text[:500]}")
+                history_parts.append(f"[Turn {turn} reasoning]\n{response_text}")
 
             result.turns.append(turn_log)
 
@@ -188,6 +199,7 @@ class S1Method(BaseMethod):
         result.total_prompt_tokens = sum(t.prompt_tokens for t in result.turns)
         result.total_output_tokens = sum(t.output_tokens for t in result.turns)
         result.em = exact_match(result.final_answer, answer_gt)
+        result.f1 = f1_score(result.final_answer, answer_gt)
 
         return result
 

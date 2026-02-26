@@ -38,6 +38,7 @@ class MethodResult:
     answer_gt: str                           # Ground truth
     final_answer: str                        # Model's final answer
     em: bool = False                         # Exact match against ground truth
+    f1: float = 0.0                          # F1 score against ground truth
 
     # Per-turn logs
     turns: list[TurnLog] = field(default_factory=list)
@@ -63,6 +64,7 @@ class MethodResult:
             "answer_gt": self.answer_gt,
             "final_answer": self.final_answer,
             "em": self.em,
+            "f1": self.f1,
             "turns_used": self.turns_used,
             "search_calls_used": self.search_calls_used,
             "total_prompt_tokens": self.total_prompt_tokens,
@@ -113,7 +115,13 @@ class BaseMethod(ABC):
         self.verbose = verbose
 
     @abstractmethod
-    async def run_question(self, question_id: str, question: str, answer_gt: str) -> MethodResult:
+    async def run_question(
+        self, 
+        question_id: str, 
+        question: str, 
+        answer_gt: str,
+        pbar: Optional[any] = None,
+    ) -> MethodResult:
         """
         Run the method on a single question.
 
@@ -121,6 +129,7 @@ class BaseMethod(ABC):
             question_id: Unique identifier for this question.
             question: The question text.
             answer_gt: Ground truth answer (used only for EM computation, not leaked to model).
+            pbar: Optional tqdm progress bar for this question.
 
         Returns:
             MethodResult with final_answer, em, and detailed logs.

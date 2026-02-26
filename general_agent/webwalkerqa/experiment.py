@@ -53,6 +53,7 @@ async def run_experiment(
     dataset_path: str = None,
     max_examples: int = None,
     max_concurrent: int = 4,
+    num_samples: int = 1,
     verbose: bool = False,
 ) -> dict:
     """
@@ -65,6 +66,7 @@ async def run_experiment(
         dataset_path: Path to local JSON (auto-downloads if None)
         max_examples: Limit dataset size
         max_concurrent: Max concurrent questions
+        num_samples: Number of samples per question
         verbose: Print per-question output
 
     Returns:
@@ -76,6 +78,7 @@ async def run_experiment(
     print(f"k={config.k} threads, n={config.n} turns, t={config.t} tokens/thread/turn")
     print(f"Total tokens (est.): {config.total_tokens:,}")
     print(f"Model: {model}")
+    print(f"Samples per question: {num_samples}")
     print(f"{'='*60}\n")
 
     # Load dataset
@@ -97,29 +100,36 @@ async def run_experiment(
     available_positions = list(range(1, max_concurrent + 1))
     pos_lock = asyncio.Lock()
 
-    async def run_one(example):
+    async def run_one_sample(example, sample_idx):
         try:
             async with semaphore:
                 async with pos_lock:
                     pos = available_positions.pop(0)
                 
-                # Create a progress bar for this question
+                # Create a progress bar for this question sample
+                desc = f"Q {example.id}" if num_samples == 1 else f"Q {example.id} (S{sample_idx+1})"
                 q_pbar = tqdm(
                     total=config.n if config.method != "oracle" else 8, 
-                    desc=f"Q {example.id}: Starting", 
+                    desc=f"{desc}: Starting", 
                     position=pos, 
                     leave=False
                 )
                 
                 try:
+                    # Individual samples go into a 'samples' subdirectory to avoid cluttering
+                    sample_output_dir = output_dir / "samples" if num_samples > 1 else output_dir
                     res = await run_question(
                         example=example,
                         config=config,
                         model=model,
-                        output_dir=output_dir,
+                        output_dir=sample_output_dir,
                         verbose=verbose,
                         pbar=q_pbar,
+                        sample_idx=sample_idx if num_samples > 1 else None,
                     )
+                    # For pass@k, we rename the question_id in the result so it doesn't look like a duplicate
+                    # but keep the original id for grouping
+                    res.sample_idx = sample_idx 
                     return res
                 finally:
                     q_pbar.close()
@@ -136,20 +146,62 @@ async def run_experiment(
                 error=str(e)
             )
 
-    tasks = [run_one(ex) for ex in examples]
+    # Create a list of all sample tasks to run
+    all_tasks = []
+    for ex in examples:
+        for s in range(num_samples):
+            all_tasks.append(run_one_sample(ex, s))
 
-    # Process with progress updates
-    pbar = tqdm(asyncio.as_completed(tasks), total=len(examples), desc=f"Config {config.id}", position=0)
+    # Process all samples
+    pbar = tqdm(asyncio.as_completed(all_tasks), total=len(all_tasks), desc=f"Config {config.id}", position=0)
+    
+    # We'll collect multiple results per question_id
+    id_to_results = {ex.id: [] for ex in examples}
+    
     for coro in pbar:
         result = await coro
-        results.append(result)
-        n_correct = sum(1 for r in results if r.em)
-        avg_f1 = sum(r.f1 if hasattr(r, 'f1') else 0 for r in results) / len(results)
-        pbar.set_postfix({"EM": f"{n_correct/len(results):.2f}", "F1": f"{avg_f1:.2f}"})
+        id_to_results[result.question_id].append(result)
+        
+        # Periodic update of stats
+        # (This calculates average EM/F1 across all samples completed so far)
+        n_correct = 0
+        total_samples = 0
+        total_f1 = 0.0
+        for r_list in id_to_results.values():
+            for r in r_list:
+                if r.em: n_correct += 1
+                total_f1 += r.f1 if hasattr(r, 'f1') else 0
+                total_samples += 1
+        
+        if total_samples > 0:
+            pbar.set_postfix({"EM": f"{n_correct/total_samples:.2f}", "F1": f"{total_f1/total_samples:.2f}"})
 
-    # Compute summary
-    result_dicts = [r.to_dict() for r in results]
-    scores = compute_scores(result_dicts)
+    # Prepare final result list (aggregated per question)
+    aggregated_results = []
+    for qid, r_list in id_to_results.items():
+        # Use first result as base for metadata
+        base_res = r_list[0]
+        
+        # Collect multiple answers and metrics
+        final_answers = [r.final_answer for r in r_list]
+        
+        # Build an aggregated result dictionary for eval
+        agg_dict = base_res.to_dict()
+        agg_dict["final_answer"] = final_answers
+        agg_dict["individual_results"] = [r.to_dict() for r in r_list]
+        aggregated_results.append(agg_dict)
+        
+        # Save aggregated JSON for this question
+        q_output_path = output_dir / f"q_{qid}.json"
+        with open(q_output_path, "w") as f:
+            json.dump(agg_dict, f, indent=2)
+
+    # Compute summary scores
+    scores = compute_scores(aggregated_results)
+
+    # Get flat list of all results for token counting and stats
+    all_individual_results = [r for r_list in id_to_results.values() for r in r_list]
+    num_total_individual = len(all_individual_results)
 
     summary = {
         "config_id": config.id,
@@ -160,12 +212,13 @@ async def run_experiment(
         "model": model,
         "timestamp": timestamp,
         "num_questions": len(examples),
+        "num_samples": num_samples,
         **scores,
-        "avg_turns_used": sum(r.turns_used for r in results) / len(results) if results else 0,
-        "avg_search_calls": sum(r.search_calls_used for r in results) / len(results) if results else 0,
-        "total_prompt_tokens": sum(r.total_prompt_tokens for r in results),
-        "total_output_tokens": sum(r.total_output_tokens for r in results),
-        "num_errors": sum(1 for r in results if r.error),
+        "avg_turns_used": sum(r.turns_used for r in all_individual_results) / num_total_individual if num_total_individual else 0,
+        "avg_search_calls": sum(r.search_calls_used for r in all_individual_results) / num_total_individual if num_total_individual else 0,
+        "total_prompt_tokens": sum(r.total_prompt_tokens for r in all_individual_results),
+        "total_output_tokens": sum(r.total_output_tokens for r in all_individual_results),
+        "num_errors": sum(1 for r in all_individual_results if r.error),
     }
 
     # Save summary
@@ -235,6 +288,10 @@ def main():
         help="Max concurrent question processing (default: 4)",
     )
     parser.add_argument(
+        "--num-samples", type=int, default=1,
+        help="Number of samples per question for pass@k (default: 1)",
+    )
+    parser.add_argument(
         "--output-dir", type=str, default=str(DEFAULT_OUTPUT_BASE),
         help=f"Output directory (default: {DEFAULT_OUTPUT_BASE})",
     )
@@ -267,23 +324,35 @@ def main():
             dataset_path=args.dataset,
             max_examples=args.max_examples,
             max_concurrent=args.max_concurrent,
+            num_samples=args.num_samples,
             verbose=args.verbose,
         ))
         all_summaries.append(summary)
 
     # Print final comparison table
     if len(all_summaries) > 1:
-        print("\n" + "=" * 70)
+        print("\n" + "=" * 90)
         print("FINAL COMPARISON")
-        print("=" * 70)
-        print(f"{'Config':<10} {'Method':<12} {'k':>4} {'t':>6} {'EM':>8} {'F1':>8} {'Searches':>10}")
-        print("-" * 78)
+        print("=" * 90)
+        
+        # Determine metrics to show based on whether multiple samples were used
+        has_samples = any(s.get('num_samples', 1) > 1 for s in all_summaries)
+        
+        header = f"{'Config':<10} {'Method':<12} {'k':>4} {'EM':>8} {'F1':>8}"
+        if has_samples:
+            header += f" {'Pass@2':>8} {'Pass@4':>8} {'Pass@8':>8} {'Pass@16':>8}"
+        header += f" {'Searches':>10}"
+        
+        print(header)
+        print("-" * len(header))
+        
         for s in all_summaries:
-            print(
-                f"{s['config_id']:<10} {s['method']:<12} {s['k']:>4} {s['t']:>6} "
-                f"{s['em']:>8.4f} {s['f1']:>8.4f} {s['avg_search_calls']:>10.1f}"
-            )
-        print("=" * 70)
+            row = f"{s['config_id']:<10} {s['method']:<12} {s['k']:>4} {s['em']:>8.4f} {s['f1']:>8.4f}"
+            if has_samples:
+                row += f" {s.get('pass@2', 0):>8.4f} {s.get('pass@4', 0):>8.4f} {s.get('pass@8', 0):>8.4f} {s.get('pass@16', 0):>8.4f}"
+            row += f" {s['avg_search_calls']:>10.1f}"
+            print(row)
+        print("=" * len(header))
 
 
 if __name__ == "__main__":

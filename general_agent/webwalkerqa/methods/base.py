@@ -57,8 +57,8 @@ class MethodResult:
     error: Optional[str] = None
 
     def to_dict(self) -> dict:
-        """Serialize to JSON-compatible dict."""
-        return {
+        """Serialize to JSON-compatible dict with conditional fields."""
+        data = {
             "question_id": self.question_id,
             "question": self.question,
             "answer_gt": self.answer_gt,
@@ -72,21 +72,30 @@ class MethodResult:
             "method": self.method,
             "config_id": self.config_id,
             "error": self.error,
-            "turns": [
-                {
-                    "turn": t.turn,
-                    "thread_queries": t.thread_queries,
-                    "thread_summaries": t.thread_summaries,
-                    "reasoning": t.reasoning,
-                    "search_queries": t.search_queries,
-                    "parent_response": t.parent_response,
-                    "answer_found": t.answer_found,
-                    "prompt_tokens": t.prompt_tokens,
-                    "output_tokens": t.output_tokens,
-                }
-                for t in self.turns
-            ],
+            "turns": []
         }
+
+        for t in self.turns:
+            turn_data = {
+                "turn": t.turn,
+                "answer_found": t.answer_found,
+                "prompt_tokens": t.prompt_tokens,
+                "output_tokens": t.output_tokens,
+            }
+            
+            if self.method == "s1":
+                turn_data["reasoning"] = t.reasoning
+                turn_data["search_queries"] = t.search_queries
+            else:
+                # Parallel/T³ methods
+                turn_data["thread_queries"] = t.thread_queries
+                turn_data["thread_results"] = t.thread_results
+                turn_data["thread_summaries"] = t.thread_summaries
+                turn_data["parent_response"] = t.parent_response
+                
+            data["turns"].append(turn_data)
+            
+        return data
 
 
 _PLACEHOLDER_ANSWERS = {"[answer]", "your answer here", "your complete answer here",
@@ -99,13 +108,24 @@ def extract_answer(text: str) -> Optional[str]:
     Returns None if no tag found or if the content is a placeholder string
     (guards against prompt templates that contain literal example tags).
     """
-    match = re.search(r"<answer>(.*?)</answer>", text, re.DOTALL | re.IGNORECASE)
+    return extract_tag(text, "answer")
+
+
+def extract_tag(text: str, tag: str) -> Optional[str]:
+    """Extract content from <tag>...</tag> tags."""
+    pattern = rf"<{tag}>(.*?)</{tag}>"
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     if match:
-        answer = match.group(1).strip()
-        if answer.lower() in _PLACEHOLDER_ANSWERS:
+        content = match.group(1).strip()
+        if content.lower() in _PLACEHOLDER_ANSWERS:
             return None
-        return answer
+        return content
     return None
+
+
+def format_history_turn(query: str, information: str) -> str:
+    """Format a search/information pair for the history turns block."""
+    return f"<search> {query} </search>\n<information> {information} </information>"
 
 
 class BaseMethod(ABC):

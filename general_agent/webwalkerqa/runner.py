@@ -30,6 +30,7 @@ async def run_question(
     output_dir: Path,
     verbose: bool = False,
     pbar: Optional[any] = None,
+    sample_idx: Optional[int] = None,
 ) -> MethodResult:
     """
     Run a method on one question and save the result to output_dir.
@@ -40,11 +41,11 @@ async def run_question(
         model: LiteLLM model string.
         output_dir: Directory to write per-question JSON.
         verbose: Print debug output.
-
-    Returns:
-        MethodResult with final answer and all logs.
+        pbar: Optional progress bar.
+        sample_idx: Optional index for pass@k samples.
     """
-    output_file = output_dir / f"q_{example.id}.json"
+    suffix = f"_s{sample_idx}" if sample_idx is not None else ""
+    output_file = output_dir / f"q_{example.id}{suffix}.json"
 
     # Resume: skip if already done
     if output_file.exists():

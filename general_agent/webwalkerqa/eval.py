@@ -14,9 +14,7 @@ Pass@k (oracle):
 
 import re
 import string
-from typing import Union
-
-
+import math
 from typing import Union, List
 
 
@@ -100,38 +98,69 @@ def pass_at_k(predictions: List[str], ground_truth: Union[str, List]) -> bool:
     return any(exact_match(p, ground_truth) for p in predictions)
 
 
+def estimate_pass_at_k(n: int, c: int, k: int) -> float:
+    """
+    Standard estimator for pass@k.
+    n: total samples
+    c: number of correct samples
+    k: k for pass@k
+    """
+    if n - c < k:
+        return 1.0
+    return 1.0 - math.comb(n - c, k) / math.comb(n, k)
+
+
 def compute_scores(
     results: List[dict],
     pred_key: str = "final_answer",
     gt_key: str = "answer_gt",
 ) -> dict:
     """
-    Compute aggregate EM and F1 statistics over a list of result dicts.
-
-    Args:
-        results: List of per-question result dicts.
-        pred_key: Key for the model's predicted answer.
-        gt_key: Key for the ground truth answer.
-
-    Returns:
-        Dict with keys: em, f1, num_correct, num_total.
+    Compute aggregate EM, F1, and Pass@k statistics.
+    If multiple samples are provided per question, 'final_answer' should be a list.
     """
-    num_correct = 0
-    total_f1 = 0.0
     num_total = len(results)
+    if num_total == 0:
+        return {"em": 0, "f1": 0, "num_correct": 0, "num_total": 0}
+
+    total_em = 0.0
+    total_f1 = 0.0
+    
+    # For pass@k
+    pass_k_values = [1, 2, 4, 8, 16]
+    total_pass_k = {k: 0.0 for k in pass_k_values}
+    has_multiple_samples = False
 
     for r in results:
-        pred = r.get(pred_key, "") or ""
+        pred = r.get(pred_key, "")
         gt = r.get(gt_key, "")
-        if exact_match(pred, gt):
-            num_correct += 1
-        total_f1 += f1_score(pred, gt)
+        
+        if isinstance(pred, list):
+            has_multiple_samples = True
+            n = len(pred)
+            c = sum(1 for p in pred if exact_match(p, gt))
+            
+            # Pass@1 is same as average EM
+            total_em += c / n
+            total_f1 += sum(f1_score(p, gt) for p in pred) / n
+            
+            for k in pass_k_values:
+                if k <= n:
+                    total_pass_k[k] += estimate_pass_at_k(n, c, k)
+        else:
+            if exact_match(pred, gt):
+                total_em += 1
+            total_f1 += f1_score(pred, gt)
 
-    em = num_correct / num_total if num_total > 0 else 0.0
-    avg_f1 = total_f1 / num_total if num_total > 0 else 0.0
-    return {
-        "em": em, 
-        "f1": avg_f1,
-        "num_correct": num_correct, 
-        "num_total": num_total
+    scores = {
+        "em": total_em / num_total,
+        "f1": total_f1 / num_total,
+        "num_correct": total_em,  # Total equivalent correct questions
+        "num_total": num_total,
     }
+    
+    if has_multiple_samples:
+        for k, val in total_pass_k.items():
+            scores[f"pass@{k}"] = val / num_total
+            
+    return scores

@@ -36,10 +36,41 @@ WEBWALKERQA_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG="${1:-A1}"
 MODEL="${2:-openai/gpt-4o-mini}"
 MAX_CONCURRENT="${MAX_CONCURRENT:-4}"
+NUM_SAMPLES="${NUM_SAMPLES:-1}"
 MAX_EXAMPLES="${MAX_EXAMPLES:-}"
+DATASET_PATH="${DATASET:-}"
 VERBOSE="${VERBOSE:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-$AGENT_DIR/results/webwalkerqa}"
 ENV_FILE="${ENV_FILE:-$AGENT_DIR/.env}"
+
+# Shift first two positional args
+shift $(( $# > 0 ? 1 : 0 ))
+shift $(( $# > 0 ? 1 : 0 ))
+
+# Parse remaining flags
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dataset)
+            DATASET_PATH="$2"
+            shift 2
+            ;;
+        --max-examples)
+            MAX_EXAMPLES="$2"
+            shift 2
+            ;;
+        --num-samples)
+            NUM_SAMPLES="$2"
+            shift 2
+            ;;
+        --verbose)
+            VERBOSE=1
+            shift 1
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
 
 # ── Load env ──────────────────────────────────────────────────────────────────
 if [[ -f "$ENV_FILE" ]]; then
@@ -81,8 +112,10 @@ esac
 
 CMD+=(--model "$MODEL")
 CMD+=(--max-concurrent "$MAX_CONCURRENT")
+CMD+=(--num-samples "$NUM_SAMPLES")
 CMD+=(--output-dir "$OUTPUT_DIR")
 
+[[ -n "$DATASET_PATH" ]] && CMD+=(--dataset "$DATASET_PATH")
 [[ -n "$MAX_EXAMPLES" ]] && CMD+=(--max-examples "$MAX_EXAMPLES")
 [[ -n "$VERBOSE" ]] && CMD+=(--verbose)
 

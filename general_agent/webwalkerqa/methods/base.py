@@ -25,6 +25,8 @@ class TurnLog:
     # Parent synthesis
     parent_response: str = ""
     answer_found: bool = False
+    # Dynamic methods: threads spawned this turn (0 if answer/summary only)
+    k_used: int = 0
     # Token accounting
     prompt_tokens: int = 0
     output_tokens: int = 0
@@ -52,6 +54,7 @@ class MethodResult:
     # Method metadata
     method: str = ""
     config_id: str = ""
+    metadata: dict = field(default_factory=dict)
 
     # Error (if run failed)
     error: Optional[str] = None
@@ -72,6 +75,7 @@ class MethodResult:
             "method": self.method,
             "config_id": self.config_id,
             "error": self.error,
+            "metadata": self.metadata,
             "turns": []
         }
 
@@ -92,6 +96,7 @@ class MethodResult:
                 turn_data["thread_results"] = t.thread_results
                 turn_data["thread_summaries"] = t.thread_summaries
                 turn_data["parent_response"] = t.parent_response
+                turn_data["k_used"] = t.k_used
                 
             data["turns"].append(turn_data)
             
@@ -123,9 +128,60 @@ def extract_tag(text: str, tag: str) -> Optional[str]:
     return None
 
 
+def extract_fallback_answer(text: str) -> Optional[str]:
+    """
+    Last-resort: extract answer if model skipped tags.
+    Heuristic: ignores lines that look like actions or thinking process.
+    """
+    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
+    
+    # Ignore lines that are clearly actions or thinking headers
+    skip_prefixes = (
+        "<search>", "<summary>", "<answer>", "<spawn", "Thinking Process:", 
+        "Action:", "What I found:", "What is missing:", "Step ", "Query:", "Result:"
+    )
+    
+    # Look for a line that isn't a tag or a header
+    # We iterate backwards because the answer is usually at the end
+    for line in reversed(lines):
+        # Skip if it matches known junk prefixes
+        if any(line.startswith(p) for p in skip_prefixes):
+            continue
+        # Skip if it contains raw search tags anywhere
+        if "<search>" in line or "</search>" in line or "<spawn" in line:
+            continue
+        # Skip very long blocks (likely reasoning chunks)
+        if len(line) > 500:
+            continue
+        # If we reach here, this is likely the answer string
+        return line
+            
+    # Absolute last resort: return the last non-empty line truncated and cleaned
+    if lines:
+        last_line = lines[-1]
+        # Clean up tags from the last line if any
+        clean_line = re.sub(r'<.*?>', '', last_line).strip()
+        if not clean_line and len(lines) > 1:
+            clean_line = re.sub(r'<.*?>', '', lines[-2]).strip()
+            
+        if len(clean_line) > 200:
+            return clean_line[:200] + "..."
+        return clean_line or "No answer provided."
+        
+    return None
+
+
 def format_history_turn(query: str, information: str) -> str:
     """Format a search/information pair for the history turns block."""
     return f"<search> {query} </search>\n<information> {information} </information>"
+
+
+def safe_format_prompt(template: str, **kwargs) -> str:
+    """Safely format a prompt template, handling arbitrary text in values."""
+    prompt = template
+    for key, value in kwargs.items():
+        prompt = prompt.replace(f"{{{key}}}", str(value))
+    return prompt
 
 
 class BaseMethod(ABC):

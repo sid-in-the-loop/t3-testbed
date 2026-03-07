@@ -17,13 +17,17 @@ Registry:
 from .base import BaseMethod, MethodResult, TurnLog
 from .s1 import S1Method
 from .t3_fixed import T3FixedMethod
+from .t3_variants import T3AnchorMethod, T3DiversityJaccardMethod, T3DynamicMethod, T3DynamicJaccardMethod
+from .diversity_turn import DiversityTurnMethod
 
 _REGISTRY: dict[str, type] = {
     "s1": S1Method,
     "t3_fixed": T3FixedMethod,
-    # Future:
-    # "t3_dynamic": T3DynamicMethod,
-    # "t3_dpp": T3DPPMethod,
+    "t3_anchor": T3AnchorMethod,
+    "t3_diversity_jaccard": T3DiversityJaccardMethod,
+    "t3_dynamic": T3DynamicMethod,
+    "t3_dynamic_jaccard": T3DynamicJaccardMethod,
+    "diversity_turn": DiversityTurnMethod,
 }
 
 
@@ -36,6 +40,6 @@ def get_method(name: str) -> type:
 
 __all__ = [
     "BaseMethod", "MethodResult", "TurnLog",
-    "S1Method", "T3FixedMethod",
+    "S1Method", "T3FixedMethod", "T3AnchorMethod", "T3DiversityJaccardMethod", "T3DynamicMethod", "T3DynamicJaccardMethod",
     "get_method",
 ]

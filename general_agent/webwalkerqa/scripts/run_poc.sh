@@ -40,7 +40,8 @@ NUM_SAMPLES="${NUM_SAMPLES:-1}"
 MAX_EXAMPLES="${MAX_EXAMPLES:-}"
 DATASET_PATH="${DATASET:-}"
 VERBOSE="${VERBOSE:-}"
-OUTPUT_DIR="${OUTPUT_DIR:-$AGENT_DIR/results/webwalkerqa}"
+OUTPUT_DIR="${OUTPUT_DIR:-$AGENT_DIR/results}"
+OUTPUT_SUBDIR="${OUTPUT_SUBDIR:-}"
 ENV_FILE="${ENV_FILE:-$AGENT_DIR/.env}"
 
 # Shift first two positional args
@@ -60,6 +61,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --num-samples)
             NUM_SAMPLES="$2"
+            shift 2
+            ;;
+        --output-subdir)
+            OUTPUT_SUBDIR="$2"
             shift 2
             ;;
         --verbose)
@@ -91,22 +96,18 @@ case "${CONFIG,,}" in
     all)
         CMD+=(--all)
         ;;
-    s1|s1-only)
+    s1-only)
         CMD+=(--s1-only)
         ;;
-    t3|t3-only)
+    t3-only)
         CMD+=(--t3-only)
         ;;
     a|b|c)
         CMD+=(--group "${CONFIG^^}")
         ;;
-    a1|a2|b1|b2|b3|c1|c2|c3|oracle)
-        CMD+=(--config "${CONFIG^^}")
-        ;;
     *)
-        echo "[ERROR] Unknown config: $CONFIG"
-        echo "  Valid: A1 A2 B1 B2 B3 C1 C2 C3 Oracle | all | s1 | t3 | A | B | C"
-        exit 1
+        # If not a special keyword, assume it's a specific config ID
+        CMD+=(--config "$CONFIG")
         ;;
 esac
 
@@ -114,6 +115,7 @@ CMD+=(--model "$MODEL")
 CMD+=(--max-concurrent "$MAX_CONCURRENT")
 CMD+=(--num-samples "$NUM_SAMPLES")
 CMD+=(--output-dir "$OUTPUT_DIR")
+[[ -n "$OUTPUT_SUBDIR" ]] && CMD+=(--output-subdir "$OUTPUT_SUBDIR")
 
 [[ -n "$DATASET_PATH" ]] && CMD+=(--dataset "$DATASET_PATH")
 [[ -n "$MAX_EXAMPLES" ]] && CMD+=(--max-examples "$MAX_EXAMPLES")

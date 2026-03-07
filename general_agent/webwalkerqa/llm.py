@@ -16,7 +16,22 @@ import asyncio
 import logging
 from typing import Optional
 
+import litellm
+from litellm.caching import Cache
+litellm.drop_params = True  # Drop unsupported params silently
+
 logger = logging.getLogger(__name__)
+
+# LLM Caching disabled due to disk I/O issues on cluster filesystem
+
+# Configure gpt-5-nano with provided pricing
+litellm.model_cost["gpt-5-nano"] = {
+    "max_tokens": 128000,
+    "input_cost_per_token": 0.05 / 1e6,
+    "output_cost_per_token": 0.005 / 1e6,
+    "cache_read_input_token_cost": 0.40 / 1e6,
+}
+litellm.model_alias_map["gpt-5-nano"] = "openai/gpt-4o-mini"
 
 
 async def call_llm(
@@ -39,11 +54,8 @@ async def call_llm(
     Returns:
         Tuple of (text, prompt_tokens, output_tokens).
     """
-    try:
-        import litellm
-        litellm.drop_params = True  # Drop unsupported params silently
-    except ImportError:
-        raise ImportError("litellm is required. Install with: pip install litellm")
+    if os.getenv("OPENAI_API_KEY"):
+        litellm.api_key = os.getenv("OPENAI_API_KEY")
 
     kwargs: dict = {
         "model": model,

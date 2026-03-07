@@ -30,47 +30,56 @@ from typing import Optional
 from ..llm import call_llm
 from ..search import web_search
 from ..eval import exact_match, f1_score
-from .base import BaseMethod, MethodResult, TurnLog, extract_answer, extract_tag, format_history_turn
+from .base import BaseMethod, MethodResult, TurnLog, extract_answer, extract_tag, format_history_turn, extract_fallback_answer, safe_format_prompt
 
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
 # Provided original prompts
-SHORT_ANSWER_PROMPT_BASE = """Your are a research assistant with the ability to perform web searches to answer questions. You can answer a question with many turns of search and reasoning.
+SHORT_ANSWER_PROMPT_BASE = """Your are a research assistant with the ability to perform web searches to answer questions. You can answer a question with many turns of search and reasoning. Based on the history information, you need to suggest the next action to complete the task.
 
-Based on the history information, you need to suggest the next action to complete the task. 
 You will be provided with:
 1. Your history search attempts: query in format <search> query </search> and the returned search results in <information> and </information>.
 2. The question to answer.
 
 IMPORTANT: You must strictly adhere to the following rules:
 1. Choose ONLY ONE action from the list below for each response, DO NOT perform more than one action per step.
-    2. Follow the exact syntax format for the selected action, DO NOT create or use any actions other than those listed.
-    3. **Don't do duplicate search.** Pay attention to the history search results.
-    4. You are currently at Turn {turn} out of {max_turns}. You have remaining turns available if you need to perform more searches to gather definitive evidence or verify your findings before answering.
+2. Follow the exact syntax format for the selected action, DO NOT create or use any actions other than those listed.
+3. **Don't do duplicate search.** Pay attention to the history search results.
+4. You are currently at Turn {turn} out of {max_turns}. You MUST find the answer or provide your best guess before Turn {max_turns} ends.
+5. DO NOT guess the answer if the search results do not provide evidence. If you are unsure, continue searching or state that the information is missing.
+6. IF THIS IS TURN {max_turns}, YOU MUST USE THE <answer> TAG. DO NOT SUGGEST A SEARCH OR SUMMARY ON TURN {max_turns}. 
 
 Valid actions:
 1. <search> query </search>: search the web for information if you consider you lack some knowledge.
-2. <answer> answer </answer>: output the final answer if you consider you are able to answer the question. Be direct, factual, and to the point. No justification is needed.
-3. <summary> important parts of the history turns </summary>: summarize the history turns. Reflect the search queries and search results in you history turns, and keep the information you consider important for answering the question and generating your report. Still keep the tag structure, keep search queries between <search> and </search>, and keep search results between <information> and </information>. The history turn information for your subsequent turns will be updated accoring to this summary action.
+2. <answer> answer </answer>: output the final answer if you consider you are able to answer the question. The answer should be short and concise. No justification is needed.
+3. <summary> important parts of the history turns </summary>: summarize the history turns. Reflect the search queries and search results in you history turns, and keep the information you consider important for answering the question. Still keep the tag structure, keep search queries between <search> and </search>, and keep search results between <information> and </information>. The history turn information for your subsequent turns will be updated according to this summary action.
 
 Output instructions:
-First, you should think step-by-step about the question and the history turns.
+First, you should think step-by-step about the question and the history turns. 
+In your thinking process, you MUST explicitly state:
+- What I found: [concise summary of gathered info]
+- What is missing: [specific info that still needs to be found]
+
 Then you should choose **ONLY ONE** of the following actions:
-- If You want to search, You should put the query between <search> and </search>. 
+- If You want to search, You should put the query between <search> and </search>.
 - If You want to summarize the history turns, You should put the summary between <summary> and </summary>.
 - If You want to give the final answer, You should put the answer between <answer> and </answer>.
 You can only use ONE action per response.
 
 Format:
-Thinking Process: [thinking process]
+Thinking Process: 
+[your step-by-step reasoning]
+What I found: [summary]
+What is missing: [missing info]
+
 Action: [action]
 
-Note: text between <information></information> is the search results from search engine after you peruse a search action, **DO NOT** include any information in <information></information> in your search action.
+Note: text between <information></information> is the search results from search engine after you perform a search action, **DO NOT** include any information in <information></information> in your output.
 
 Question: {question}
 
-History Turns: (empty if this is the first turn)
+History Turns: 
 {history}
 """
 
@@ -125,7 +134,7 @@ class S1Method(BaseMethod):
                 
                 turn_log = TurnLog(turn=turn) # We'll log each step as a new entry for visibility
                 
-                user_content = SHORT_ANSWER_PROMPT_BASE.format(
+                user_content = safe_format_prompt(SHORT_ANSWER_PROMPT_BASE,
                     question=question,
                     history=history_str or "(empty)",
                     turn=turn,
@@ -168,7 +177,7 @@ class S1Method(BaseMethod):
                 query = extract_tag(response_text, "search")
                 if query:
                     self._log(f"Turn {turn} Step {step}: searching '{query}'")
-                    sr = web_search(query, max_chars=_MAX_SEARCH_CHARS)
+                    sr = await web_search(query, max_chars=_MAX_SEARCH_CHARS)
                     total_search_calls += 1
                     
                     # Causal update: feed result back IMMEDIATELY for the next step
@@ -191,15 +200,10 @@ class S1Method(BaseMethod):
             if pbar:
                 pbar.update(1)
 
-        # Fallback extraction
-        if final_answer is None and result.turns:
-            last_reasoning = result.turns[-1].reasoning
-            final_answer = extract_tag(last_reasoning, "answer") or _extract_fallback_answer(last_reasoning)
-
         # Fallback extraction if no <answer> tag found after n turns
         if final_answer is None and result.turns:
             last_reasoning = result.turns[-1].reasoning
-            final_answer = extract_tag(last_reasoning, "answer") or _extract_fallback_answer(last_reasoning)
+            final_answer = extract_tag(last_reasoning, "answer") or extract_fallback_answer(last_reasoning)
 
         result.final_answer = final_answer or ""
         result.turns_used = len(result.turns)
@@ -212,11 +216,5 @@ class S1Method(BaseMethod):
         return result
 
 
-def _extract_fallback_answer(text: str) -> Optional[str]:
-    """Last-resort: take the last substantive line if model skipped tags."""
-    lines = [l.strip() for l in text.strip().split("\n") if l.strip()]
-    for line in reversed(lines):
-        skip_prefixes = ("<search>", "<summary>", "Thinking Process:", "Action:")
-        if len(line) < 500 and not any(line.startswith(p) for p in skip_prefixes):
-            return line
-    return lines[-1][:400] if lines else None
+def _dummy_placeholder():
+    pass

@@ -55,6 +55,7 @@ async def run_experiment(
     max_concurrent: int = 4,
     num_samples: int = 1,
     verbose: bool = False,
+    output_subdir: str = None,
 ) -> dict:
     """
     Run a single experiment config on WebWalkerQA.
@@ -87,33 +88,36 @@ async def run_experiment(
 
     # Output directory for this run
     model_short = model.split("/")[-1].replace(":", "_")
+    
+    # Extract dataset name for organized results
+    dataset_name = "webwalkerqa"
+    if dataset_path:
+        dataset_name = Path(dataset_path).stem.replace("test_random_250", "wwqa").replace("test", "gaia")
+    out_subdir = output_subdir or dataset_name
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_dir = output_base / f"{config.id}_{model_short}" / "questions"
+    output_dir = output_base / out_subdir / f"{config.id}_{model_short}" / "questions"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Run questions with concurrency control
     semaphore = asyncio.Semaphore(max_concurrent)
     results = []
     
-    # Track active progress bars to assign positions
-    # Position 0 is main bar, positions 1 to max_concurrent are for questions
-    available_positions = list(range(1, max_concurrent + 1))
-    pos_lock = asyncio.Lock()
+    # Disable nested progress bars if running at high concurrency to avoid log pollution
+    show_nested_bars = max_concurrent <= 4 and verbose
 
     async def run_one_sample(example, sample_idx):
         try:
             async with semaphore:
-                async with pos_lock:
-                    pos = available_positions.pop(0)
-                
-                # Create a progress bar for this question sample
-                desc = f"Q {example.id}" if num_samples == 1 else f"Q {example.id} (S{sample_idx+1})"
-                q_pbar = tqdm(
-                    total=config.n if config.method != "oracle" else 8, 
-                    desc=f"{desc}: Starting", 
-                    position=pos, 
-                    leave=False
-                )
+                # Create a progress bar only if requested
+                q_pbar = None
+                if show_nested_bars:
+                    desc = f"Q {example.id}" if num_samples == 1 else f"Q {example.id} (S{sample_idx+1})"
+                    q_pbar = tqdm(
+                        total=config.n if config.method != "oracle" else 8, 
+                        desc=f"{desc}: Starting", 
+                        leave=False
+                    )
                 
                 try:
                     # Individual samples go into a 'samples' subdirectory to avoid cluttering
@@ -132,18 +136,17 @@ async def run_experiment(
                     res.sample_idx = sample_idx 
                     return res
                 finally:
-                    q_pbar.close()
-                    async with pos_lock:
-                        available_positions.append(pos)
-                        available_positions.sort()
-        except Exception as e:
-            # Ensure we return a failed result instead of crashing the whole experiment
+                    if q_pbar:
+                        q_pbar.close()
+        except BaseException as e:
+            # Catching BaseException ensures we handle CancelledError, KeyboardInterrupt, etc.
+            err_msg = str(e) or e.__class__.__name__
             return MethodResult(
                 question_id=example.id,
                 question=example.question,
                 answer_gt=str(example.answer),
                 final_answer="",
-                error=str(e)
+                error=f"CRITICAL_ERROR: {err_msg}"
             )
 
     # Create a list of all sample tasks to run
@@ -153,7 +156,14 @@ async def run_experiment(
             all_tasks.append(run_one_sample(ex, s))
 
     # Process all samples
-    pbar = tqdm(asyncio.as_completed(all_tasks), total=len(all_tasks), desc=f"Config {config.id}", position=0)
+    # mininterval=30 makes it only print to the log file every 30 seconds
+    pbar = tqdm(
+        asyncio.as_completed(all_tasks), 
+        total=len(all_tasks), 
+        desc=f"Config {config.id}", 
+        position=0,
+        mininterval=30.0
+    )
     
     # We'll collect multiple results per question_id
     id_to_results = {ex.id: [] for ex in examples}
@@ -192,7 +202,7 @@ async def run_experiment(
         aggregated_results.append(agg_dict)
         
         # Save aggregated JSON for this question
-        q_output_path = output_dir / f"q_{qid}.json"
+        q_output_path = output_dir / f"agg_q_{qid}.json"
         with open(q_output_path, "w") as f:
             json.dump(agg_dict, f, indent=2)
 
@@ -222,7 +232,7 @@ async def run_experiment(
     }
 
     # Save summary
-    summary_path = output_base / f"{config.id}_{model_short}" / "summary.json"
+    summary_path = output_base / out_subdir / f"{config.id}_{model_short}" / "summary.json"
     summary_path.parent.mkdir(parents=True, exist_ok=True)
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
@@ -295,6 +305,10 @@ def main():
         "--output-dir", type=str, default=str(DEFAULT_OUTPUT_BASE),
         help=f"Output directory (default: {DEFAULT_OUTPUT_BASE})",
     )
+    parser.add_argument(
+        "--output-subdir", type=str, default=None,
+        help="Subdir under output-dir (e.g. gaia_random_50_1). If not set, uses dataset name.",
+    )
     parser.add_argument("--verbose", action="store_true", help="Print per-question output")
 
     args = parser.parse_args()
@@ -326,6 +340,7 @@ def main():
             max_concurrent=args.max_concurrent,
             num_samples=args.num_samples,
             verbose=args.verbose,
+            output_subdir=args.output_subdir,
         ))
         all_summaries.append(summary)
 

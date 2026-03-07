@@ -22,6 +22,8 @@ def _normalize(text: str) -> str:
     """Normalize a string for EM comparison."""
     if not text:
         return ""
+    if not isinstance(text, str):
+        text = str(text)
     text = text.lower().strip()
     # Remove articles
     text = re.sub(r"\b(a|an|the)\b", " ", text)

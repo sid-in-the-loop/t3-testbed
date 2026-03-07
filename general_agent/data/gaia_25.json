@@ -1,0 +1,352 @@
+[
+  {
+    "id": 4,
+    "task_id": "e1fc63a2-da7a-432f-be78-7c4a95598703",
+    "question": "If Eliud Kipchoge could maintain his record-making marathon pace indefinitely, how many thousand hours would it take him to run the distance between the Earth and the Moon its closest approach? Please use the minimum perigee value on the Wikipedia page for the Moon when carrying out your calculation. Round your result to the nearest 1000 hours and do not use any comma separators if necessary.",
+    "answer": "17",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Googled Eliud Kipchoge marathon pace to find 4min 37sec/mile\n2. Converted into fractions of hours.\n3. Found moon periapsis in miles (225,623 miles).\n4. Multiplied the two to find the number of hours and rounded to the nearest 100 hours.",
+      "Number of steps": "4",
+      "How long did this take?": "20 Minutes",
+      "Tools": "1. A web browser.\n2. A search engine.\n3. A calculator.",
+      "Number of tools": "3"
+    }
+  },
+  {
+    "id": 6,
+    "task_id": "8e867cd7-cff9-4e6c-867a-ff5ddc2550be",
+    "question": "How many studio albums were published by Mercedes Sosa between 2000 and 2009 (included)? You can use the latest 2022 version of english wikipedia.",
+    "answer": "3",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. I did a search for Mercedes Sosa\n2. I went to the Wikipedia page for her\n3. I scrolled down to \"Studio albums\"\n4. I counted the ones between 2000 and 2009",
+      "Number of steps": "4",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. web browser\n2. google search",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 15,
+    "task_id": "dd3c7503-f62a-4bd0-9f67-1b63b94194cc",
+    "question": "Use density measures from the chemistry materials licensed by Marisa Alviar-Agnew & Henry Agnew under the CK-12 license in LibreText's Introductory Chemistry materials as compiled 08/21/2023.\n\nI have a gallon of honey and a gallon of mayonnaise at 25C. I remove one cup of honey at a time from the gallon of honey. How many times will I need to remove a cup to have the honey weigh less than the mayonaise? Assume the containers themselves weigh the same.",
+    "answer": "6",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Search \"LibreText density mayonnaise\"\n2. Click result, confirm the correct license.\n3. Search \"cm^3 to 1 cup\"\n4. Use results with density measures to form the equation (16*236.588)(1.420 - 0.910)/(236.588*1.420)\n5. Round up",
+      "Number of steps": "5",
+      "How long did this take?": "20 minutes",
+      "Tools": "1. Search engine\n2. Web browser\n3. Calculator",
+      "Number of tools": "3"
+    }
+  },
+  {
+    "id": 19,
+    "task_id": "46719c30-f4c3-4cad-be07-d5cb21eee6bb",
+    "question": "Of the authors (First M. Last) that worked on the paper \"Pie Menus or Linear Menus, Which Is Better?\" in 2015, what was the title of the first paper authored by the one that had authored prior papers?",
+    "answer": "Mapping Human Oriented Information to Software Agents for Online Systems Usage",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"Pie Menus or Linear Menus, Which Is Better?\" on Google.\n2. Opened \"Pie Menus or Linear Menus, Which Is Better?\" on https://oda.oslomet.no/oda-xmlui/handle/10642/3162.\n3. Clicked each author's name.\n4. Noted the name that had no other papers listed.\n5. Searched \"Murano, Pietro\" on Google.\n6. Opened http://www.pietromurano.org/.\n7. Clicked \"Publications\".\n8. Found the earliest paper he contributed to.",
+      "Number of steps": "8",
+      "How long did this take?": "10 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 22,
+    "task_id": "4b6bb5f7-f634-410e-815d-e673ab7f8632",
+    "question": "In Series 9, Episode 11 of Doctor Who, the Doctor is trapped inside an ever-shifting maze. What is this location called in the official script for the episode? Give the setting exactly as it appears in the first scene heading.",
+    "answer": "THE CASTLE",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Search the web for \u201cDoctor Who series 9 episode 11 official script\u201d.\n2. Click result on the BBC website.\n3. Scroll through the PDF to read the script, noting that it takes place in a mechanical castle location.\n4. Scroll back to the first scene heading to note the answer, THE CASTLE",
+      "Number of steps": "4",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Search engine\n2. Web browser\n3. PDF viewer",
+      "Number of tools": "3"
+    }
+  },
+  {
+    "id": 25,
+    "task_id": "e4e91f1c-1dcd-439e-9fdd-cb976f5293fd",
+    "question": "I need to fact-check a citation. This is the citation from the bibliography:\n\nGreetham, David. \"Uncoupled: OR, How I Lost My Author(s).\" Textual Cultures: Texts, Contexts, Interpretation, vol. 3 no. 1, 2008, p. 45-46. Project MUSE, doi:10.2979/tex.2008.3.1.44.\n\nAnd this is the in-line citation:\n\nOur relationship with the authors of the works we read can often be \u201cobscured not by a \"cloak of print\" but by the veil of scribal confusion and mis-transmission\u201d (Greetham 45-46).\n\nDoes the quoted text match what is actually in the article? If Yes, answer Yes, otherwise, give me the word in my citation that does not match with the correct one (without any article).",
+    "answer": "cloak",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Search the web for \u201cgreetham uncoupled project muse\u201d.\n2. Click result, an article that matches the given citation.\n3. Ctrl-F for \u201cobscured\u201d.\n4. Find the quote from the question, which describes a \u201cveil of print\u201d, not a cloak.\n5. Express the answer in the specified format, No.",
+      "Number of steps": "5",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Search engine\n2. Web browser",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 38,
+    "task_id": "e8cb5b03-41e0-4086-99e5-f6806cd97211",
+    "question": "I went to Virtue restaurant & bar in Chicago for my birthday on March 22, 2021 and the main course I had was delicious!  Unfortunately, when I went back about a month later on April 21, it was no longer on the dinner menu.  Using the Wayback Machine, can you help me figure out which main course was on the dinner menu for Virtue on March 22, 2021 but not April 21, 2021? Answer using the singular form, without articles.",
+    "answer": "shrimp",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Search the web for \"Virtue restaurant & bar Chicago\"\n2. Find the restaurant's website, https://www.virtuerestaurant.com\n3. Find the page for the dinner menu, https://www.virtuerestaurant.com/menus/\n4. Paste the URL of this page into the Wayback Machine at web.archive.org\n5. Open the versions of the page archived on March 22, 2021 and April 21, 2021\n6. Ensure that both pages are open to the \"dinner menu\" tab\n7. Find the \"large ration\" that was present on the March 22 version of the menu but not April 21: shrimp",
+      "Number of steps": "7",
+      "How long did this take?": "30 minutes",
+      "Tools": "1. Web browser\n2. Search engine\n3. Access to the Internet Archive, web.archive.org\n4. Text processing/diff tool",
+      "Number of tools": "4"
+    }
+  },
+  {
+    "id": 40,
+    "task_id": "dc28cf18-6431-458b-83ef-64b3ce566c10",
+    "question": "My family reunion is this week, and I was assigned the mashed potatoes to bring. The attendees include my married mother and father, my twin brother and his family, my aunt and her family, my grandma and her brother, her brother's daughter, and his daughter's family. All the adults but me have been married, and no one is divorced or remarried, but my grandpa and my grandma's sister-in-law passed away last year. All living spouses are attending. My brother has two children that are still kids, my aunt has one six-year-old, and my grandma's brother's daughter has three kids under 12. I figure each adult will eat about 1.5 potatoes of mashed potatoes and each kid will eat about 1/2 a potato of mashed potatoes, except my second cousins don't eat carbs. The average potato is about half a pound, and potatoes are sold in 5-pound bags. How many whole bags of potatoes do I need? Just give the number.",
+    "answer": "2",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Calculate the number of adults (mother, father, brother, brother's wife, aunt, aunt's husband, grandma, grandma's brother, grandma's brother's daughter, grandma's brother's daughter's husband, me = 11).\n2. Calculate the number of children (niece, nephew, cousin, grandma's brother's daughter's kids x3 = 6).\n3. Subtract the number of second cousins (grandma's brother's daughter's kids) (6 - 3 = 3).\n4. Calculate the adult potatoes (11 * 1.5 = 16.5).\n5. Calculate the child potatoes (3 * 0.5 = 1.5).\n6. Add to get the total potatoes (16.5 + 1.5 = 18).\n7. Multiply to get the pounds of potatoes (18 * 0.5 = 9 pounds).\n8. Calculate the number of 5-lb bags needed (9 / 5 = 1.8).\n9. Round up to get total bags (2).",
+      "Number of steps": "9",
+      "How long did this take?": "8 minutes",
+      "Tools": "1. Calculator",
+      "Number of tools": "1"
+    }
+  },
+  {
+    "id": 41,
+    "task_id": "b816bfce-3d80-4913-a07d-69b752ce6377",
+    "question": "In Emily Midkiff's June 2014 article in a journal named for the one of Hreidmar's sons that guarded his house, what word was quoted from two different authors in distaste for the nature of dragon depictions?",
+    "answer": "fluffy",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"Hreidmar's sons\" on Google.\n2. Opened https://en.wikipedia.org/wiki/Hrei%C3%B0marr.\n3. Noted Fafnir guarded his house.\n4. Searched \"Emily Midkiff June 2014 Fafnir\" on Google.\n5. Opened \"Fafnir 2/2014 |\" at http://journal.finfar.org/journal/archive/fafnir-22014/.\n6. Clicked the title '\u201cDragons are Tricksy\u201d: The Uncanny Dragons of Children\u2019s Literature'.\n7. Found the word in quotation marks from two different authors (Ruth Stein and Margaret Blount) in the text.",
+      "Number of steps": "7",
+      "How long did this take?": "10 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 42,
+    "task_id": "f46b4380-207e-4434-820b-f32ce04ae2a4",
+    "question": "It is 1999. Before you party like it is 1999, please assist me in settling a bet.\n\nFiona Apple and Paula Cole released albums prior to 1999. Of these albums, which didn't receive a letter grade from Robert Christgau? Provide your answer as a comma delimited list of album titles, sorted alphabetically.",
+    "answer": "Harbinger, Tidal",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. search \"Fiona Apple discography\"\n2. find her album released prior to 1999 was \"Tidal\"\n3. search \"Paula Cole discography\"\n4. find her album released prior to 1999 was \"This Fire\" and \"Harbinger\".\n5. search \"Robert Christgau\"\n6. use his website to search \"Fiona Apple\"\n7. note his review for Tidal was an emoticon, not a letter grade\n8. use his website to search \"Paula Cole\"\n9. note his review for This Fire was a C+ and that he did not review Harbinger.",
+      "Number of steps": "9",
+      "How long did this take?": "10 minutes",
+      "Tools": "1. web browser\n2. search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 44,
+    "task_id": "05407167-39ec-4d3a-a234-73a9120c325d",
+    "question": "In the 2018 VSCode blog post on replit.com, what was the command they clicked on in the last video to remove extra lines?",
+    "answer": "Format Document",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Opened replit.com.\n2. Clicked \"Blog\".\n3. Searched \"vscode\".\n4. Opened \"Zero Setup VSCode Intelligence\" from 2018.\n5. Scrolled down to the bottom video.\n6. Noted the command used (Format Document).",
+      "Number of steps": "6",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Web browser\n2. GIF parsing tools",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 50,
+    "task_id": "42576abe-0deb-4869-8c63-225c2d75a95a",
+    "question": "In the fictional language of Tizin, basic sentences are arranged with the Verb first, followed by the direct object, followed by the subject of the sentence. I want to express my love for apples to my Tizin friend. \n\nThe word that indicates oneself is \"Pa\" is the nominative form, \"Mato\" is the accusative form, and \"Sing\" is the genitive form. \n\nThe root verb that indicates an intense like for something is \"Maktay\". When it is used in the present, it is used in it's root form, when it is used in the preterit past, it is \"Tay\", and when it is used in the imperfect past, it is \"Aktay\". It is used differently than in English, and is better translated as \"is pleasing to\", meaning that the thing doing the liking is actually the object of the sentence rather than the subject.\n\nThe word for apples is borrowed from English in Tizin, and so it is \"Apple\" is the nominative form, \"Zapple\" is the accusative form, and \"Izapple\" is the genitive form. \n\nPlease translate \"I like apples\" to Tizin.",
+    "answer": "Maktay mato apple",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Determine the order of words from the prompt (Verb - Object - Subject).\n2. Determine the present form of Like (\"Maktay\")\n3. Determined that since the person doing the liking is the object of the sentence, the next word must be the one for oneself in object form.\n4. Determined the accusative form for onesself (\"mato\").\n5. Determined the nominative form for apple. (\"apple\").\n6. Put the words together in the correct order.",
+      "Number of steps": "6",
+      "How long did this take?": "2 minutes",
+      "Tools": "None",
+      "Number of tools": "0"
+    }
+  },
+  {
+    "id": 81,
+    "task_id": "c8b7e059-c60d-472e-ad64-3b04ae1166dc",
+    "question": "The work referenced in footnote 397 of Federico Lauria's 2014 dissertation is also the source for the titles of two paintings in the Smithsonian American Art Museum's collection, as of August 2023. What is the absolute difference between the chapter numbers of the chapters that the titles of these two paintings quote?",
+    "answer": "8",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Use search engine to search for \"Federico Lauria's 2014 dissertation\".\n2. Open the result from philarchive.org and open the PDF file for the full paper.\n3. Search for footnote 397 to find that the referenced work is Thomas Hobbes's \"Leviathan\".\n4. Use search engine to search for \"Smithsonian American Art Museum collection search\".\n5. Go to the museum's search webpage.\n6. Enter \"Hobbes Leviathan\" into the search box and submit the search.\n7. Open the two results, one by Jan Stussy (\"A free man...\") and one by Leon Karp (\"Hereby it is manifest...\").\n8. Verify from the full titles of these works that the titles are quotes from \"Leviathan\".\n9. Use search engine to search for \"Thomas Hobbes Leviathan full text\".\n10. Open any result that contains the full text, like the Project Gutenberg version.\n11. Search the text for the titles of each painting, using different substrings from the titles as needed to account for variations in spelling and punctuation.\n12. Find that the \"A free man...\" quote is from Chapter XXI (21) and that the \"Hereby it is manifest...\" quote is from Chapter XIII (13).\n13. Calculate the absolute difference of the chapter numbers: 21 - 13 = 8.",
+      "Number of steps": "13",
+      "How long did this take?": "7 minutes",
+      "Tools": "1. Web browser\n2. Search engine\n3. Calculator",
+      "Number of tools": "3"
+    }
+  },
+  {
+    "id": 98,
+    "task_id": "f2feb6a4-363c-4c09-a804-0db564eafd68",
+    "question": "I\u2019m thinking about selling my home, so I want to learn more about how homes in my area sold recently. I live in Pearl City, Hawaii, which is on the island of Oahu. I know two homes near me that sold in 2022 were 2072 Akaikai Loop, and 2017 Komo Mai Drive. Find which of those homes sold for more in 2022, and tell me how much it sold for. Don\u2019t put commas or decimal places in the answer.",
+    "answer": "900000",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Search the web for \u201c2072 akaikai loop pearl city hi\u201d.\n2. Click Zillow result.\n3. Navigate to \u201cPrice and tax history\u201d.\n4. Find the amount the house sold for when it was sold in 2022: $860,000.\n5. Search the web for \u201c2017 komo mai drive pearl city hi\u201d.\n6. Click Zillow result.\n7. Navigate to \u201cPrice and tax history\u201d.\n8. Find the amount the house sold for when it was sold in 2022: $900,000.\n9. Express the higher amount in the specified format, $900000.",
+      "Number of steps": "9",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Search engine\n2. Web browser",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 110,
+    "task_id": "d0633230-7067-47a9-9dbf-ee11e0a2cdd6",
+    "question": "In the Scikit-Learn July 2017 changelog, what other predictor base command received a bug fix? Just give the name, not a path.",
+    "answer": "BaseLabelPropagation",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"Scikit-Learn July 2017 changelog\" on Google.\n2. Opened \"Release History\" from the Scikit-Learn website.\n3. Clicked \"Other versions\" in the upper left.\n4. Opened the links, starting from the bottom, until one was found that included the \"July 2017\" changelog under the News.\n5. Looked for the \"Bug fixes\" section.\n6. Looked under \"Other predictors\" in that section.",
+      "Number of steps": "6",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 112,
+    "task_id": "305ac316-eef6-4446-960a-92d80d542f82",
+    "question": "Who did the actor who played Ray in the Polish-language version of Everybody Loves Raymond play in Magda M.? Give only the first name.",
+    "answer": "Wojciech",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Search \"Polish-language version of Everybody Loves Raymond\" and pull up the Wiki page for Wszyscy kochaj\u0105 Romana.\n2. See that Bart\u0142omiej Kasprzykowski is marked as playing Ray and go to his Wiki page.\n3. See that he is stated to have played Wojciech P\u0142aska in Magda M.",
+      "Number of steps": "3",
+      "How long did this take?": "5 minutes",
+      "Tools": "None",
+      "Number of tools": "0"
+    }
+  },
+  {
+    "id": 121,
+    "task_id": "0a65cb96-cb6e-4a6a-8aae-c1084f613456",
+    "question": "During the first week of August 2015, one of the NASA Astronomy Pictures of the Day shows the lights of a city on the horizon. The namesake of this city also has a landmark building in Chicago named after him. What is the name of the architectural firm that designed this landmark building? Give the first name appearing in the name of the firm as of June 2023.",
+    "answer": "Holabird",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Use search engine to search for \"NASA Astronomy Pictures of the Day August 2015\".\n2. Navigate to the NASA Astronomy Picture of the Day Archive.\n3. Open the Astronomy Picture of the Day for 2015 August 1-7.\n4. Read the descriptions to check which picture shows the lights of a city on the horizon (2015 August 3) and note the name of the city (Marquette, Michigan, USA).\n5. Go to the Wikipedia article for Marquette, Michigan and note that the city was named after Jacques Marquette.\n6. Go to the Wikipedia article for Jacques Marquette and note that the Marquette Building in Chicago was named after him.\n7. Go to the Wikipedia page for the Marquette Building and verify that it is a Chicago landmark.\n8. Read the article and note that it was designed by architects Holabird & Roche.\n9. Go to the Wikipedia page for Holabird & Roche.\n10. Under \"View history\", select the latest version of the page revised during or before June 2023.\n11. Note that the name of the firm is Holabird & Root as of June 2023.",
+      "Number of steps": "11",
+      "How long did this take?": "15 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 123,
+    "task_id": "e142056d-56ab-4352-b091-b56054bd1359",
+    "question": "Bob was invited to participate in a game show, and he advanced to the final round. The final round offered Bob the chance to win a large sum by playing a game against the host. The host has 30 shiny prop coins, each of which is worth $1,000 if Bob manages to win them by playing the game. The host hides the coins in three different prize boxes and then shuffles their order. The only rule restricting the host's coin placement is that one box must contain at least 2 coins, and one box must contain 6 more coins than another box. In order to play, Bob must submit three guesses, one guess for the number of coins in each box. The box is then opened and the number of coins is revealed. If Bob's guess is a number greater than the number of coins in the box, Bob earns no coins. If Bob guesses a number equal to or less than the number of coins in the box, Bob wins a number of coins equal to his guess.\n\nIf Bob plays uses the optimal strategy, what's the minimum amount of money he can win from the game?",
+    "answer": "16000",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "Step 1: Evaluate the problem statement provided by my user, storing the relevant information: \n30 coins with a value of $1,000 distributed between 3 boxes.\nEach box must contain at least 2 coins\nOne box must contain 6 more coins than another\n\nStep 2: Evaluate the base distribution: 2-8-20, noting that two boxes must contain at least 8 coins\n\nStep 3: Evaluate the most even allowable distribution: 8,8,14, noting that two boxes must contain at least 8 coins\n\nStep 4: Evaluate a case where Bob guesses 8 for each box in the outlier distributions.\nStep 5: For the worst case 2-8-20 distribution, Bob wins 0+8+8 = 16 coins\nStep 6: For the 8-8-14 distribution, Bob wins 8+8+8 = 24 coins\nStep 7: Convert the worst-case coin count to a prize value, 16*$1,000 = $16,000\nStep 8: Report the correct answer to my user: \"$16,000\"",
+      "Number of steps": "8",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. A calculator",
+      "Number of tools": "1"
+    }
+  },
+  {
+    "id": 128,
+    "task_id": "7673d772-ef80-4f0f-a602-1bf4485c9b43",
+    "question": "On Cornell Law School website's legal information institute, under the fifth section of federal rules alphabetically, what word was deleted in the last amendment to the first rule in the article that has \"witnesses\" in the most titles as of 2021?",
+    "answer": "inference",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"Cornell Law School legal information institute\" on Google.\n2. Opened https://www.law.cornell.edu/.\n3. Clicked Get The Law > Federal Rules > Federal Rules of Evidence (fourth section down).\n4. Found the article that has \"witnesses\" in the most titles (VII).\n5. Opened the first rule (701).\n6. Scrolled to the last amendment as of 2021 (2011 amendment).\n7. Found the word that was deleted (inference).",
+      "Number of steps": "7",
+      "How long did this take?": "10 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 136,
+    "task_id": "3f57289b-8c60-48be-bd80-01f8099ca449",
+    "question": "How many at bats did the Yankee with the most walks in the 1977 regular season have that same season?",
+    "answer": "519",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Search \"yankee stats\" to find their MLB stats page.\n2. Set the data to the 1977 regular season.\n3. Sort to find the most walks.\n4. See how many at bats the player had.",
+      "Number of steps": "4",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. web browser\n2. search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 145,
+    "task_id": "9e1fc53b-46ff-49a1-9d05-9e6faac34cc5",
+    "question": "A 5-man group made up of one tank, one healer, and three DPS is doing a dungeon that was just released in World of Warcraft. Two are plate wearers and two are cloth wearers. At the final boss, both the tank and the healer are casting holy spells. Ice and fire are being used, each one by a different DPS. A bear from the group is attacking the boss. Metamorphosis is cast. The Kilt of the Forgotten One drops as loot, but no one can use it. If all classes were using their class abilities and all classes are unique, what are the five classes in the group in alphabetical order separated by commas?",
+    "answer": "Death Knight, Hunter, Paladin, Priest, Warlock",
+    "Level": 3,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"WoW classes\" on Google.\n2. Opened \"https://worldofwarcraft.blizzard.com/en-us/game/classes\".\n3. Made an alphabetical list of all WoW classes: Death Knight, Demon Hunter, Druid, Evoker, Hunter, Mage, Monk, Paladin, Priest, Rogue, Shaman, Warlock, and Warrior.\n4. Opened each page and noted the armor type: Death Knight (plate), Demon Hunter (leather), Druid (leather), Evoker (mail), Hunter (mail), Mage (cloth), Monk (leather), Paladin (plate), Priest (cloth), Rogue (leather), Shaman (mail), Warlock (cloth), and Warrior (plate).\n5. Looked up \"Kilt of the Forgotten One\" on Google.\n6. Opened https://www.wowhead.com/wotlk/item=37616/kilt-of-the-forgotten-one.\n7. Noted that it is leather, and none of the classes can use it, so the remaining classes are: Death Knight (plate), Evoker (mail), Hunter (mail), Mage (cloth), Paladin (plate), Priest (cloth), Shaman (mail), Warlock (cloth), and Warrior (plate).\n8. Noted that it was added in Wrath of the Lich King, so if the dungeon is newly released, the era is the Wrath of the Lich King expansion.\n9. Searched \"Wrath of the Lich King class abilities\" on Google.\n10. Opened https://www.wowhead.com/wotlk/spells/abilities.\n11. Sorted by class and noted that Evokers, Demon Hunters, and Monks did not exist yet, so the remaining classes are: Death Knight (plate), Hunter (mail), Mage (cloth), Paladin (plate), Priest (cloth), Shaman (mail), Warlock (cloth), and Warrior (plate).\n12. Checked which classes use Holy school abilities, Paladin (plate) and Priest (cloth), so they must be in the group as tank and healer.\n13. Checked which classes use ice (Frost) and fire abilities, Death Knight (plate), Mage (cloth), Shaman (mail), and Warlock (cloth).\n14. There can only be one other plate class, so it must be Death Knight or Warrior, and one other cloth class, so it must be Mage or Warlock.\n15. Metamorphosis is a Warlock ability in Wrath of the Lich King, so it must be the other cloth class, and the group so far is Paladin, Priest, Warlock, plate DPS, and other DPS, with remaining options of Death Knight (plate), Hunter (mail), Mage (cloth), Shaman (mail), and Warrior (plate).\n16. There cannot be another cloth class, so the remaining options are Death Knight (plate), Hunter (mail), Shaman (mail), and Warrior (plate).\n17. There is a bear attacking the boss and there is no Druid to shapeshift into a bear, so it must be a Hunter's pet, making the group Paladin, Priest, Warlock, Hunter, and plate DPS, with remaining options of Death Knight (plate), Hunter (mail), Mage (cloth), Shaman (mail), and Warrior (plate).\n18. The last class is plate, leaving only Death Knight and Warrior.\n19. Hunters and Warlocks can both cast Fire abilities but cannot cast Frost abilities, so the last DPS must cast ice (Frost) abilities, making the last DPS a Frost Death Knight since Warriors have no Frost abilities.\n20. Order the group alphabetically: Death Knight, Hunter, Paladin, Priest, Warlock.",
+      "Number of steps": "20",
+      "How long did this take?": "20 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 147,
+    "task_id": "1dcc160f-c187-48c2-b68e-319bd4354f3d",
+    "question": "According to Openreview.net, at the NeurIPS 2022 Conference, how many papers by an author named Yuri were accepted with a \"certain\" recommendation?",
+    "answer": "3",
+    "Level": 2,
+    "Annotator_Metadata": {
+      "Steps": "1. Went to openreview.net.\n2. Scroll down and clicked the \"All venues\" link.\n3. Clicked \"NeurIPS\".\n4. Opened the \"2022\" toggle menu.\n5. Clicked \"NeurIPS 2022 Conference\".\n6. Opened the top paper.\n7. Clicked \"Go to NeurIPS 2022 Conference homepage\".\n8. Searched \"Yuri\" in the search box.\n9. Opened each of the four papers and checked the Recommendation field.\n10. Counted the \"Certain\" recommendations.",
+      "Number of steps": "8",
+      "How long did this take?": "10 minutes",
+      "Tools": "1. Web browser\n2. Search engine",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 150,
+    "task_id": "a0068077-79f4-461a-adfe-75c1a4148545",
+    "question": "What was the actual enrollment count of the clinical trial on H. pylori in acne vulgaris patients from Jan-May 2018 as listed on the NIH website?",
+    "answer": "90",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"nih\" on Google search.\n2. Clicked the top link to nih.gov.\n3. Searched \"h pylori acne\" in the search box.\n4. Clicked \"More\" and selected \"Clinical Trials\".\n5. Clicked the result about H. Pylori and acne.\n6. Checked the date to confirm it was January to May 2018.\n7. Opened \"Tabular View\".\n8. Scrolled down to Actual Enrollment and recorded the number.",
+      "Number of steps": "8",
+      "How long did this take?": "8 minutes",
+      "Tools": "1. Search engine\n2. Web browser",
+      "Number of tools": "2"
+    }
+  },
+  {
+    "id": 155,
+    "task_id": "5f982798-16b9-4051-ab57-cfc7ebdb2a91",
+    "question": "I read a paper about multiwavelength observations of fast radio bursts back in March 2021 on Arxiv, and it had a fascinating diagram of an X-ray time profile. There was a similar burst-1 diagram in another paper from one of the same authors about fast radio bursts back in July 2020, but I can't recall what the difference in seconds in the measured time span was. How many more seconds did one measure than the other? Just give the number.",
+    "answer": "0.2",
+    "Level": 3,
+    "Annotator_Metadata": {
+      "Steps": "1. Searched \"arxiv\" on Google.\n2. Opened arXiv.\n3. Searched \"multiwavelength observations of fast radio bursts\" on arXiv.\n4. Scrolled down to March 2021.\n5. Opened the \"Multiwavelength observations of Fast Radio Bursts\" PDF in a new tab.\n6. Opened each author's name to find the one that had a July 2020 paper (Nicastro, L).\n7. Opened the \"The lowest frequency Fast Radio Bursts: Sardinia Radio Telescope detection of the periodic FRB 180916 at 328 MHz\" PDF.\n8. Searched \"time profile\" in the first paper.\n9. Noted the time span of the diagram (0.3 s).\n10. Searched \"burst-1 profile\" in the second paper.\n11. Noted the time span of the diagram (0.5 s).\n12. Subtracted the two (0.5 - 0.3 = 0.2 s).",
+      "Number of steps": "12",
+      "How long did this take?": "15 minutes",
+      "Tools": "1. PDF access\n2. Calculator\n3. Web browser\n4. Search engine",
+      "Number of tools": "4"
+    }
+  },
+  {
+    "id": 156,
+    "task_id": "a0c07678-e491-4bbc-8f0b-07405144218f",
+    "question": "Who are the pitchers with the number before and after Taish\u014d Tamai's number as of July 2023? Give them to me in the form Pitcher Before, Pitcher After, use their last names only, in Roman characters.",
+    "answer": "Yoshida, Uehara",
+    "Level": 1,
+    "Annotator_Metadata": {
+      "Steps": "1. Look up Taish\u014d Tamai on Wikipedia\n2. See the pitcher with the number 18 (before) is K\u014dsei Yoshida and number 20 (after) is Kenta Uehara",
+      "Number of steps": "2",
+      "How long did this take?": "5 minutes",
+      "Tools": "1. Wikipedia",
+      "Number of tools": "1"
+    }
+  }
+]

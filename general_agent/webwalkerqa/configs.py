@@ -15,11 +15,13 @@ from typing import Literal
 class ExperimentConfig:
     """Single experiment configuration."""
     id: str                           # e.g. "A1", "B2"
-    method: Literal["s1", "t3_fixed", "oracle"]
+    method: Literal["s1", "t3_fixed", "t3_anchor", "t3_diversity_jaccard", "t3_dynamic", "oracle", "diversity_turn"]
     k: int                            # threads (T³) or search-scale factor (s1)
     n: int                            # turns
     t: int                            # tokens per thread per turn
     group: str                        # compute-matched group: "A", "B", "C"
+    o: int = 0                        # oversample pool size at turn 1 (for diversity experiments)
+    diversity_method: str = "dpp"     # diversity selection method (dpp, mmr, naive, random)
     description: str = ""
 
     @property
@@ -88,17 +90,92 @@ EXPERIMENT_MATRIX: dict[str, ExperimentConfig] = {
         id="Oracle", method="oracle", k=8, n=6, t=1024,
         group="Oracle", description="Oracle: pass@8 (best of 8 independent s1 runs)",
     ),
+
+    # ── Controlled Experiment Suite (25 GAIA samples) ────────────────────────
+    "s1": ExperimentConfig(
+        id="s1", method="s1", k=1, n=6, t=1024,
+        group="controlled", description="Sequential baseline: 1 thread, 6 turns, 1024 tokens/turn",
+    ),
+    "T3-Fixed-Naive": ExperimentConfig(
+        id="T3-Fixed-Naive", method="t3_fixed", k=4, n=6, t=512,
+        group="controlled", description="T³ Fixed Naive: 4 threads, hand-crafted diversity seeds",
+    ),
+    "T3-Fixed-Anchor": ExperimentConfig(
+        id="T3-Fixed-Anchor", method="t3_anchor", k=4, n=6, t=512,
+        group="controlled", description="T³ Fixed Anchor: 4 threads, anchor-based seeds from question aspects",
+    ),
+    "T3-Fixed-Jaccard": ExperimentConfig(
+        id="T3-Fixed-Jaccard", method="t3_diversity_jaccard", k=4, n=6, t=512,
+        group="controlled", description="T³ Fixed Jaccard: 4 threads, Jaccard-based diverse query selection",
+    ),
+    "T3-Fixed-DPP": ExperimentConfig(
+        id="T3-Fixed-DPP", method="t3_diversity_jaccard", k=4, n=6, t=512,
+        group="controlled", description="T³ Fixed DPP: 4 threads, DPP-based diverse query selection (greedy approx)",
+    ),
+    "T3-Dynamic": ExperimentConfig(
+        id="T3-Dynamic", method="t3_dynamic", k=8, n=6, t=512,
+        group="controlled", description="T³ Dynamic: Parent LLM controls thread spawning (max 8 threads)",
+    ),
+    "T3-Dynamic-Jaccard": ExperimentConfig(
+        id="T3-Dynamic-Jaccard", method="t3_dynamic_jaccard", k=8, n=6, t=512,
+        group="controlled", description="T³ Dynamic Jaccard: Parent LLM decides k, Jaccard ensures query diversity (max 8 threads)",
+    ),
+
+    # ── Diversity-at-First-Turn Experiments ────────────────────────
+    "EXP1_a": ExperimentConfig(
+        id="EXP1_a", method="diversity_turn", k=1, n=12, t=1024,
+        group="diversity", o=16, diversity_method="naive", description="Naive baseline: o=16, t=1",
+    ),
+    "EXP1_b": ExperimentConfig(
+        id="EXP1_b", method="diversity_turn", k=4, n=12, t=1024,
+        group="diversity", o=16, diversity_method="naive", description="Naive baseline: o=16, t=4",
+    ),
+    "EXP1_c": ExperimentConfig(
+        id="EXP1_c", method="diversity_turn", k=8, n=12, t=1024,
+        group="diversity", o=16, diversity_method="naive", description="Naive baseline: o=16, t=8",
+    ),
+    "EXP2_a": ExperimentConfig(
+        id="EXP2_a", method="diversity_turn", k=1, n=12, t=1024,
+        group="diversity", o=48, diversity_method="dpp", description="Diversity selection: o=48, t=1",
+    ),
+    "EXP2_b": ExperimentConfig(
+        id="EXP2_b", method="diversity_turn", k=4, n=12, t=1024,
+        group="diversity", o=48, diversity_method="dpp", description="Diversity selection: o=48, t=4",
+    ),
+    "EXP2_c": ExperimentConfig(
+        id="EXP2_c", method="diversity_turn", k=8, n=12, t=1024,
+        group="diversity", o=48, diversity_method="dpp", description="Diversity selection: o=48, t=8",
+    ),
+    "EXP3_a": ExperimentConfig(
+        id="EXP3_a", method="diversity_turn", k=1, n=12, t=1024,
+        group="diversity", o=64, diversity_method="dpp", description="Diversity selection: o=64, t=1",
+    ),
+    "EXP3_b": ExperimentConfig(
+        id="EXP3_b", method="diversity_turn", k=4, n=12, t=1024,
+        group="diversity", o=64, diversity_method="dpp", description="Diversity selection: o=64, t=4",
+    ),
+    "EXP3_c": ExperimentConfig(
+        id="EXP3_c", method="diversity_turn", k=8, n=12, t=1024,
+        group="diversity", o=64, diversity_method="dpp", description="Diversity selection: o=64, t=8",
+    ),
 }
 
 
 def get_config(config_id: str) -> ExperimentConfig:
     """Get experiment config by ID (case-insensitive)."""
-    key = config_id.upper()
-    if key not in EXPERIMENT_MATRIX:
-        raise ValueError(
-            f"Unknown config '{config_id}'. Available: {list(EXPERIMENT_MATRIX.keys())}"
-        )
-    return EXPERIMENT_MATRIX[key]
+    # First try exact match
+    if config_id in EXPERIMENT_MATRIX:
+        return EXPERIMENT_MATRIX[config_id]
+
+    # Then try case-insensitive match
+    config_id_upper = config_id.upper()
+    for key in EXPERIMENT_MATRIX.keys():
+        if key.upper() == config_id_upper:
+            return EXPERIMENT_MATRIX[key]
+
+    raise ValueError(
+        f"Unknown config '{config_id}'. Available: {list(EXPERIMENT_MATRIX.keys())}"
+    )
 
 
 def list_configs(group: str = None) -> list[ExperimentConfig]:

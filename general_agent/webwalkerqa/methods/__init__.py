@@ -1,29 +1,16 @@
 """
-T³ Method implementations.
+Method implementations for GAIA-103 diversity experiment.
 
-Available:
-  s1       — sequential scaling (single thread, growing token budget)
-  t3_fixed — T³ Fixed (k parallel threads, hand-crafted diversity seeds)
-
-Future (not yet implemented, hook points exist):
-  t3_dynamic — parent LM decides k and seeds
-  t3_dpp     — DPP-based seed selection for maximum diversity
-
-Registry:
-  from webwalkerqa.methods import get_method
-  method = get_method("t3_fixed")
+- sequential: Naive parallel (k independent ReAct rollouts, no diversity).
+- diversity_parallel: One pool of o candidates, max-min select k seeds, run k threads.
 """
 
 from .base import BaseMethod, MethodResult, TurnLog
-from .s1 import S1Method
-from .t3_fixed import T3FixedMethod
+from .diversity_scaling import SequentialMethod, DiversityParallelMethod
 
 _REGISTRY: dict[str, type] = {
-    "s1": S1Method,
-    "t3_fixed": T3FixedMethod,
-    # Future:
-    # "t3_dynamic": T3DynamicMethod,
-    # "t3_dpp": T3DPPMethod,
+    "sequential": SequentialMethod,
+    "diversity_parallel": DiversityParallelMethod,
 }
 
 
@@ -35,7 +22,10 @@ def get_method(name: str) -> type:
 
 
 __all__ = [
-    "BaseMethod", "MethodResult", "TurnLog",
-    "S1Method", "T3FixedMethod",
+    "BaseMethod",
+    "MethodResult",
+    "TurnLog",
+    "SequentialMethod",
+    "DiversityParallelMethod",
     "get_method",
 ]

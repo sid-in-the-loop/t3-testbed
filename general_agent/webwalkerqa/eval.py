@@ -14,9 +14,7 @@ Pass@k (oracle):
 
 import re
 import string
-from typing import Union
-
-
+import math
 from typing import Union, List
 
 
@@ -98,6 +96,25 @@ def pass_at_k(predictions: List[str], ground_truth: Union[str, List]) -> bool:
         True if at least one prediction is an exact match.
     """
     return any(exact_match(p, ground_truth) for p in predictions)
+
+
+def estimate_pass_at_k(n: int, c: int, k: int) -> float:
+    """
+    Unbiased pass@k estimator from the Codex paper.
+    
+    Args:
+        n: Total number of samples
+        c: Number of correct samples
+        k: k for pass@k
+    
+    Returns:
+        Estimated pass@k probability
+    """
+    if n < k:
+        return float("nan")
+    if n - c < k:
+        return 1.0
+    return 1.0 - math.comb(n - c, k) / math.comb(n, k)
 
 
 def compute_scores(

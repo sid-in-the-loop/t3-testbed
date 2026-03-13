@@ -54,6 +54,7 @@ package-lock.json
 # Results, logs, and cache
 # ==========================================
 results/
+results_archive/
 archive/
 logs/
 logs_old/

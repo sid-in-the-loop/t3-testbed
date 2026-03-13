@@ -52,6 +52,7 @@ class MethodResult:
     # Method metadata
     method: str = ""
     config_id: str = ""
+    metadata: dict = field(default_factory=dict)
 
     # Error (if run failed)
     error: Optional[str] = None

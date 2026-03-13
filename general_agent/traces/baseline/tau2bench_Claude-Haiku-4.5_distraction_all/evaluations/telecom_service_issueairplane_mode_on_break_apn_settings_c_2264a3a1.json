@@ -1,9 +1,0 @@
-{
-  "benchmark": "tau2",
-  "domain": "telecom",
-  "task_id": "[service_issue]airplane_mode_on|break_apn_settings|contract_end_suspension|lock_sim_card_pin[PERSONA:None]",
-  "reward": 0.0,
-  "success": false,
-  "error": "Tool call:\nToolCall (from user)\nid: tooluse_Wlex3uO9RP-Cwp_Q0lZFUA\nname: check_payment_request\narguments:\n{}\n\nReturned:\nToolMessage (responding to user)\ntimestamp: 2025-12-31T03:49:46.848869\ncontent: You have a payment request for bill B1234321 of 65.0 USD.\n\nExpected:\nToolMessage (responding to user)\ntimestamp: 2025-12-31T03:49:46.840528\ncontent: No payment request has been made.",
-  "info": {}
-}

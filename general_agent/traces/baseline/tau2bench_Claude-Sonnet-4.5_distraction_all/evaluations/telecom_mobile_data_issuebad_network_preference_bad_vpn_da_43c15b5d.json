@@ -1,9 +1,0 @@
-{
-  "benchmark": "tau2",
-  "domain": "telecom",
-  "task_id": "[mobile_data_issue]bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy]",
-  "reward": 0.0,
-  "success": false,
-  "error": "Tool call:\nToolCall (from assistant)\nid: tooluse_JTmB_y-9TReRY4lxLMrycg\nname: terminalbench__terminalbench_execute_bash\narguments:\n{\n  \"command\": \"run_speed_test\"\n}\n\nReturned:\nToolMessage (responding to assistant)\ntimestamp: 2025-12-31T08:30:30.176982\ncontent: Error: Tool 'terminalbench__terminalbench_execute_bash' not found.\nError\n\nExpected:\nToolMessage (responding to assistant)\ntimestamp: 2025-12-31T08:30:30.159321\ncontent: {\"output\": \"Error: No container running. Call __init_task first.\", \"exit_code\": -1}",
-  "info": {}
-}

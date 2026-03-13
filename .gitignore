@@ -201,6 +201,7 @@ general_agent/*
 !general_agent/source/**
 !general_agent/run.py
 !general_agent/README.md
+!general_agent/SCALING_EXPERIMENT.md
 !general_agent/.env-example
 !general_agent/pyproject.toml
 !general_agent/requirements.txt

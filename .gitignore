@@ -225,16 +225,11 @@ general_agent/webwalkerqa/__pycache__/
 # Keep traces folder (selected traces for publication)
 !general_agent/traces/
 !general_agent/traces/**
-# Keep open-source scripts
+# Keep scripts (T3 experiment pipeline)
 !general_agent/scripts/
-general_agent/scripts/*
-!general_agent/scripts/run_baseline.sh
-!general_agent/scripts/run_pairwise_self_choice.sh
-!general_agent/scripts/run_parallel_scaling.sh
-!general_agent/scripts/run_pointwise_self_choice.sh
-!general_agent/scripts/run_sequential_scaling.sh
-!general_agent/scripts/README.md
-!general_agent/scripts/models.py
+!general_agent/scripts/**
+# Keep HOW-TO doc
+!general_agent/HOW-TO-VLLM.md
 
 # But still exclude cache/compiled artifacts (the !general_agent/source/** above would "un-ignore" them)
 general_agent/source/**/__pycache__/

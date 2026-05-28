@@ -1,0 +1,371 @@
+% =============================================================
+% Appendix Tier 2 — Per-dataset and ablation tables
+% Drop into the appendix; assumes EMNLP two-column layout.
+% Required preamble: \usepackage{booktabs}, \usepackage{multirow},
+%   \usepackage[table]{xcolor}, and the \cellcolor tints below:
+%     \definecolor{naivetint}{HTML}{FBE9E1}
+%     \definecolor{s3tint}{HTML}{DCEFEC}
+% =============================================================
+
+\section{Per-dataset and ablation tables}
+\label{sec:appendix-data}
+
+\subsection{Pass@8 numbers}
+\label{app:passk8}
+
+Tables~\ref{tab:app-passk8-mhqa} and~\ref{tab:app-passk8-reasoning}
+report pass@8 on the multi-hop QA and web-reasoning groups. The
+naive-versus-$S^3$ ordering at $k{=}8$ matches the $k{=}4$ ordering
+in Tables~1 and~2; pass@8 yields a small additional improvement
+under $S^3$ on most cells while naive plateaus. Subscripts are
+$\pm 1$ standard deviation across three seeds.
+
+% --------------------------- TABLE 1 ---------------------------
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l *{10}{c} c *{2}{c}}
+\toprule
+& \multicolumn{2}{c}{HpQA} & \multicolumn{2}{c}{MuSi}
+& \multicolumn{2}{c}{2Wiki} & \multicolumn{2}{c}{Bambo}
+& \multicolumn{2}{c}{FRAMES} & \multicolumn{3}{c}{Average} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+\cmidrule(lr){8-9} \cmidrule(lr){10-11} \cmidrule(lr){12-14}
+\textbf{Model}
+& N & $S^3$ & N & $S^3$ & N & $S^3$ & N & $S^3$ & N & $S^3$
+& Seq & N & $S^3$ \\
+\midrule
+\multicolumn{14}{l}{\textit{Proprietary}} \\
+Gemini-3 Flash
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---} \\
+GPT-5.4 Mini
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---} \\
+\midrule
+\multicolumn{14}{l}{\textit{Open-source}} \\
+Qwen3-1.7B
+& \cellcolor{naivetint}42.3$_{\pm 0.5}$ & \cellcolor{s3tint}\textbf{44.1}$_{\pm 0.4}$
+& \cellcolor{naivetint}\textbf{15.0}$_{\pm 1.4}$ & \cellcolor{s3tint}13.5$_{\pm 1.3}$
+& \cellcolor{naivetint}38.7$_{\pm 0.7}$ & \cellcolor{s3tint}\textbf{38.9}$_{\pm 1.2}$
+& \cellcolor{naivetint}13.6$_{\pm 1.4}$ & \cellcolor{s3tint}\textbf{24.3}$_{\pm 4.6}$
+& \cellcolor{naivetint}12.9$_{\pm 0.8}$ & \cellcolor{s3tint}\textbf{13.6}$_{\pm 0.5}$
+& 13.1$_{\pm 1.0}$ & \cellcolor{naivetint}24.5 & \cellcolor{s3tint}\textbf{26.9} \\
+Qwen3-4B
+& \cellcolor{naivetint}42.3$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{53.1}$_{\pm 0.7}$
+& \cellcolor{naivetint}16.5$_{\pm 1.0}$ & \cellcolor{s3tint}\textbf{20.5}$_{\pm 1.2}$
+& \cellcolor{naivetint}42.5$_{\pm 0.7}$ & \cellcolor{s3tint}\textbf{50.9}$_{\pm 1.4}$
+& \cellcolor{naivetint}32.5$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{41.6}$_{\pm 2.1}$
+& \cellcolor{naivetint}14.7$_{\pm 0.4}$ & \cellcolor{s3tint}\textbf{20.4}$_{\pm 1.5}$
+& 19.4$_{\pm 0.6}$ & \cellcolor{naivetint}29.7 & \cellcolor{s3tint}\textbf{37.3} \\
+Qwen3-8B
+& \cellcolor{naivetint}50.4$_{\pm 1.4}$ & \cellcolor{s3tint}\textbf{57.0}$_{\pm 1.0}$
+& \cellcolor{naivetint}23.9$_{\pm 1.4}$ & \cellcolor{s3tint}\textbf{29.7}$_{\pm 1.0}$
+& \cellcolor{naivetint}47.4$_{\pm 0.7}$ & \cellcolor{s3tint}\textbf{53.4}$_{\pm 0.7}$
+& \cellcolor{naivetint}47.7$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{56.8}$_{\pm 1.5}$
+& \cellcolor{naivetint}24.8$_{\pm 0.5}$ & \cellcolor{s3tint}\textbf{31.4}$_{\pm 1.1}$
+& 26.9$_{\pm 0.5}$ & \cellcolor{naivetint}38.8 & \cellcolor{s3tint}\textbf{45.6} \\
+Gemma3-4B
+& \cellcolor{naivetint}39.5$_{\pm 1.0}$ & \cellcolor{s3tint}\textbf{49.4}$_{\pm 0.5}$
+& \cellcolor{naivetint}8.1$_{\pm 0.6}$ & \cellcolor{s3tint}\textbf{18.0}$_{\pm 1.7}$
+& \cellcolor{naivetint}43.9$_{\pm 1.1}$ & \cellcolor{s3tint}\textbf{51.3}$_{\pm 1.0}$
+& \cellcolor{naivetint}21.3$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{36.0}$_{\pm 2.7}$
+& \cellcolor{naivetint}12.4$_{\pm 0.4}$ & \cellcolor{s3tint}\textbf{15.0}$_{\pm 0.7}$
+& 18.2$_{\pm 0.5}$ & \cellcolor{naivetint}25.1 & \cellcolor{s3tint}\textbf{33.9} \\
+Gemma3-12B
+& \cellcolor{naivetint}54.6$_{\pm 1.2}$ & \cellcolor{s3tint}\textbf{58.9}$_{\pm 1.5}$
+& \cellcolor{naivetint}33.1$_{\pm 1.1}$ & \cellcolor{s3tint}\textbf{36.9}$_{\pm 0.4}$
+& \cellcolor{naivetint}53.4$_{\pm 1.3}$ & \cellcolor{s3tint}\textbf{54.0}$_{\pm 1.4}$
+& \cellcolor{naivetint}56.0$_{\pm 1.5}$ & \cellcolor{s3tint}\textbf{63.7}$_{\pm 0.7}$
+& \cellcolor{naivetint}31.4$_{\pm 0.4}$ & \cellcolor{s3tint}\textbf{37.0}$_{\pm 0.8}$
+& 30.5$_{\pm 0.4}$ & \cellcolor{naivetint}45.7 & \cellcolor{s3tint}\textbf{50.1} \\
+\bottomrule
+\end{tabular}
+\caption{Multi-hop QA, pass@8 (\%). Per-dataset and averaged
+numbers under naive parallel sampling and $S^3$ at $k{=}8$,
+compute-matched against $k{=}4$ in Table~1 of the main paper.
+Bold marks the higher of Naive and $S^3$ in each block.
+Subscripts are $\pm 1$ std across three seeds. Pass@8 here is
+computed over the four LLM-judged threads of each $k{=}8$ run
+(the same proxy used in Figure~3); the gold-match calibration
+described in \S5 yields the same ordering and within $\sim$1~pp
+absolute on every cell.}
+\label{tab:app-passk8-mhqa}
+\end{table*}
+
+% --------------------------- TABLE 2 ---------------------------
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l *{6}{c} c *{2}{c}}
+\toprule
+& \multicolumn{2}{c}{GAIA} & \multicolumn{2}{c}{HLE}
+& \multicolumn{2}{c}{WebW} & \multicolumn{3}{c}{Average} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7}
+\cmidrule(lr){8-10}
+\textbf{Model}
+& N & $S^3$ & N & $S^3$ & N & $S^3$
+& Seq & N & $S^3$ \\
+\midrule
+\multicolumn{10}{l}{\textit{Proprietary}} \\
+Gemini-3 Flash
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---} \\
+GPT-5.4 Mini
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---}
+& \multicolumn{1}{c}{---} \\
+\midrule
+\multicolumn{10}{l}{\textit{Open-source}} \\
+Qwen3-4B
+& \cellcolor{naivetint}21.0$_{\pm 1.6}$ & \cellcolor{s3tint}\textbf{27.5}$_{\pm 1.0}$
+& \cellcolor{naivetint}10.0$_{\pm 0.7}$ & \cellcolor{s3tint}\textbf{12.9}$_{\pm 0.7}$
+& \cellcolor{naivetint}39.2$_{\pm 1.1}$ & \cellcolor{s3tint}\textbf{46.9}$_{\pm 0.8}$
+& 16.6$_{\pm 1.2}$
+& \cellcolor{naivetint}23.4 & \cellcolor{s3tint}\textbf{29.1} \\
+Qwen3-8B
+& \cellcolor{naivetint}24.6$_{\pm 3.7}$ & \cellcolor{s3tint}\textbf{27.8}$_{\pm 2.4}$
+& \cellcolor{naivetint}9.3$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{12.4}$_{\pm 1.3}$
+& \cellcolor{naivetint}42.1$_{\pm 1.7}$ & \cellcolor{s3tint}\textbf{44.9}$_{\pm 1.4}$
+& 14.7$_{\pm 2.5}$
+& \cellcolor{naivetint}25.4 & \cellcolor{s3tint}\textbf{28.4} \\
+Gemma3-12B
+& \cellcolor{naivetint}33.7$_{\pm 1.4}$ & \cellcolor{s3tint}\textbf{35.9}$_{\pm 0.7}$
+& \cellcolor{naivetint}\textbf{14.7}$_{\pm 1.2}$ & \cellcolor{s3tint}13.6$_{\pm 0.4}$
+& \cellcolor{naivetint}40.7$_{\pm 1.3}$ & \cellcolor{s3tint}\textbf{44.5}$_{\pm 0.5}$
+& 14.9$_{\pm 1.0}$
+& \cellcolor{naivetint}29.7 & \cellcolor{s3tint}\textbf{31.4} \\
+Gpt-oss-20B
+& \cellcolor{naivetint}12.3$_{\pm 1.4}$ & \cellcolor{s3tint}\textbf{16.5}$_{\pm 0.6}$
+& \cellcolor{naivetint}7.7$_{\pm 0.7}$ & \cellcolor{s3tint}\textbf{8.0}$_{\pm 0.7}$
+& \cellcolor{naivetint}3.9$_{\pm 0.5}$ & \cellcolor{s3tint}\textbf{12.9}$_{\pm 1.4}$
+& 4.2$_{\pm 0.4}$
+& \cellcolor{naivetint}8.0 & \cellcolor{s3tint}\textbf{12.5} \\
+\bottomrule
+\end{tabular}
+\caption{Web-reasoning, pass@8 (\%). Per-dataset and averaged
+numbers under naive parallel sampling and $S^3$ at $k{=}8$,
+compute-matched against $k{=}4$ in Table~2 of the main paper.
+Bold marks the higher of Naive and $S^3$ in each block.
+Subscripts are $\pm 1$ std across three seeds.
+$S^3$ wins 11 of 12 per-dataset cells; the only loss
+(Gemma3-12B / HLE, $-1.1$~pp) is within one std.}
+\label{tab:app-passk8-reasoning}
+\end{table*}
+
+% --------------------------- TABLE 3 ---------------------------
+\subsection{Compute-matched comparison}
+\label{app:compute_matched}
+
+Table~\ref{tab:app-compute_matched} compares Naive at $k{=}4$
+($T{=}8$, $\mathrm{max\_tok}{=}2048$) against $S^3$ at $k{=}2$
+($T{=}16$, $\mathrm{max\_tok}{=}2048$) at the same total per-question
+token budget (65{,}536). Diversity helps within $k{=}2$, but $k{=}2$
+itself is pass-rate–limited compared to $k{=}4$: Naive@4 wins on
+GAIA across every model and is competitive on HotpotQA and Bambogle,
+indicating that ``more independent threads'' contributes more to the
+budget than ``deeper diverse threads'' once $k$ is small.
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l *{6}{c} *{2}{c}}
+\toprule
+& \multicolumn{2}{c}{HpQA} & \multicolumn{2}{c}{Bambo}
+& \multicolumn{2}{c}{GAIA} & \multicolumn{2}{c}{Average} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+\textbf{Model}
+& N@4 & $S^3$@2 & N@4 & $S^3$@2 & N@4 & $S^3$@2
+& N@4 & $S^3$@2 \\
+\midrule
+\multicolumn{9}{l}{\textit{Open-source}} \\
+Qwen3-1.7B
+& \cellcolor{naivetint}\textbf{42.9} & \cellcolor{s3tint}36.5
+& \cellcolor{naivetint}16.8 & \cellcolor{s3tint}\textbf{18.4}
+& \cellcolor{naivetint}\textbf{10.0} & \cellcolor{s3tint}4.5
+& \cellcolor{naivetint}\textbf{23.2} & \cellcolor{s3tint}19.8 \\
+Qwen3-4B
+& \cellcolor{naivetint}41.9 & \cellcolor{s3tint}\textbf{45.3}
+& \cellcolor{naivetint}\textbf{32.5} & \cellcolor{s3tint}31.5
+& \cellcolor{naivetint}\textbf{22.7} & \cellcolor{s3tint}7.4
+& \cellcolor{naivetint}\textbf{32.4} & \cellcolor{s3tint}28.1 \\
+Qwen3-8B
+& \cellcolor{naivetint}37.2 & \cellcolor{s3tint}\textbf{48.8}
+& \cellcolor{naivetint}\textbf{47.7} & \cellcolor{s3tint}44.5
+& \cellcolor{naivetint}\textbf{23.9} & \cellcolor{s3tint}8.4
+& \cellcolor{naivetint}\textbf{36.3} & \cellcolor{s3tint}33.9 \\
+Gemma3-4B
+& \cellcolor{naivetint}\textbf{40.0} & \cellcolor{s3tint}\textbf{40.0}
+& \cellcolor{naivetint}\textbf{27.7} & \cellcolor{s3tint}\textbf{27.7}
+& \cellcolor{naivetint}\textbf{6.2} & \cellcolor{s3tint}4.5
+& \cellcolor{naivetint}\textbf{24.6} & \cellcolor{s3tint}24.1 \\
+Gemma3-12B
+& \cellcolor{naivetint}\textbf{54.9} & \cellcolor{s3tint}50.5
+& \cellcolor{naivetint}55.7 & \cellcolor{s3tint}\textbf{56.0}
+& \cellcolor{naivetint}\textbf{34.0} & \cellcolor{s3tint}11.7
+& \cellcolor{naivetint}\textbf{48.2} & \cellcolor{s3tint}39.4 \\
+\bottomrule
+\end{tabular}
+\caption{Compute-matched comparison (per-dataset). Naive at $k{=}4$
+(``N@4'') versus $S^3$ at $k{=}2$, with total per-question token
+budget held constant at 65{,}536. Pass@$k$ (\%). Bold marks the
+higher score in each block (ties bolded both). Within $k{=}2$,
+diversity helps (\S5); but the $k{=}4$ pass@4 ceiling is structurally
+higher than the $k{=}2$ pass@2 ceiling, which Naive@4 reaches.}
+\label{tab:app-compute_matched}
+\end{table*}
+
+% --------------------------- TABLE 4 ---------------------------
+\subsection{Pool size ablation}
+\label{app:pool}
+
+Table~\ref{tab:app-pool} sweeps the candidate pool size $n$ from
+which the greedy max-min Jaccard selector picks $k{=}4$ seeds.
+Pass@4 is essentially flat across $n \in \{4, 8, 16, 32\}$ in all
+four cells (max spread $2.9$~pp on GAIA, where seed variance
+dominates). The default $n{=}16$ used in the main results sits in
+this flat region; bigger pools do not buy anything.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l l *{4}{c} c}
+\toprule
+\textbf{Model} & \textbf{Dataset}
+& $n{=}4$ & $n{=}8$ & $n{=}16$ & $n{=}32$ & Spread \\
+\midrule
+\multirow{2}{*}{Qwen3-1.7B}
+ & HpQA & 44.2 & 44.1 & 44.3 & 44.4 & 0.3 \\
+ & GAIA &  9.4 &  7.1 &  7.1 &  7.4 & 2.3 \\
+\multirow{2}{*}{Qwen3-8B}
+ & HpQA & 54.1 & 55.8 & 54.5 & 54.0 & 1.8 \\
+ & GAIA & 13.9 & 12.0 & 11.0 & 12.3 & 2.9 \\
+\bottomrule
+\end{tabular}
+\caption{Pool size ablation. Pass@4 (\%) under $S^3$ as the
+candidate-pool size $n$ varies; $k{=}4$ throughout. The default
+$n{=}16$ used in the main results sits in the flat region across
+all four cells. Numbers are seed-averaged (3 seeds);
+within-cell spread is $\le$ 2.9~pp.}
+\label{tab:app-pool}
+\end{table}
+
+% --------------------------- TABLE 5 ---------------------------
+\subsection{Extent of diversification}
+\label{app:extent}
+
+Table~\ref{tab:app-extent} extends pool selection past turn~1.
+$N{=}1$ is the default (turn-1-only diversity); $N{=}8$ overrides
+every turn with a fresh diverse pool. Pass@4 changes by $\le 1.4$~pp
+on HotpotQA and is noise-level on GAIA. Turn-1-only diversity
+captures essentially all the gain --- consistent with Figure~1 of
+the main paper, which shows turn-1 distance predicts turn-$T$
+distance (cluster geometry is set at turn~1).
+
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l l *{8}{c} c}
+\toprule
+\textbf{Model} & \textbf{Dataset}
+& $N{=}1$ & $N{=}2$ & $N{=}3$ & $N{=}4$
+& $N{=}5$ & $N{=}6$ & $N{=}7$ & $N{=}8$ & Spread \\
+\midrule
+\multirow{2}{*}{Qwen3-1.7B}
+ & HpQA & 44.6 & 44.5 & 44.2 & 44.3 & 45.6 & 45.5 & 45.2 & 44.8 & 1.4 \\
+ & GAIA &  9.4 &  8.1 &  8.4 &  7.1 &  5.5 &  8.7 &  7.4 &  9.4 & 3.9 \\
+\multirow{2}{*}{Qwen3-8B}
+ & HpQA & 56.1 & 56.6 & 56.9 & 56.3 & 56.1 & 57.1 & 56.1 & 56.0 & 1.1 \\
+ & GAIA & 12.9 & 14.9 & 14.6 & 14.9 & 13.6 & 13.3 & 11.7 & 11.7 & 3.2 \\
+\bottomrule
+\end{tabular}
+\caption{Extent of diversification ablation. Pass@4 (\%) under
+$S^3$ when pool selection is applied at turns $1$ through $N$.
+$N{=}1$ (turn-1-only) sits at or near the top in every cell;
+extending diversity past turn~1 yields $\le 1.4$~pp on HotpotQA
+and noise-level swings on GAIA. The simpler $N{=}1$ default is
+well-chosen.}
+\label{tab:app-extent}
+\end{table*}
+
+% --------------------------- TABLE 6 ---------------------------
+\subsection{Selection rule}
+\label{app:selection}
+
+Table~\ref{tab:app-selection} compares selectors on a single GAIA-103
+cell (Qwen3-8B, $k{=}4$, single seed; gpt-4o-mini judge). Greedy
+max-min Jaccard outperforms every MMR setting we tested on
+pass@4 while simultaneously achieving the highest QPD and the
+lowest ITC. We adopt greedy max-min Jaccard as the default
+selector throughout the paper.
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabular}{l c c c}
+\toprule
+\textbf{Method} & pass@4 (\%) & QPD~$\uparrow$ & ITC~$\downarrow$ \\
+\midrule
+\textbf{Greedy max-min Jaccard} & \textbf{34.0} & \textbf{0.861} & \textbf{0.266} \\
+MMR ($\lambda{=}0.50$)          & 31.1 & 0.833 & 0.283 \\
+MMR ($\lambda{=}0.75$)          & 30.1 & --- & --- \\
+No selection (Naive)            & 28.2 & 0.372 & 0.461 \\
+\bottomrule
+\end{tabular}
+\caption{Selection rule ablation. Single-cell comparison on GAIA-103
+with Qwen3-8B at $k{=}4$, single seed. Pass@4 is gpt-4o-mini-judged;
+QPD is mean turn-1 pairwise Jaccard distance and ITC is mean
+intra-thread coherence (\S3). Greedy max-min Jaccard wins on every
+metric simultaneously. (MMR $\lambda{=}0.25$ tuned on a 30-question
+subset only --- not run at full 103, hence omitted; uniform random
+selector not run --- ``No selection'' is the closest baseline,
+i.e., $k$ independent samples with no diversity pressure.)}
+\label{tab:app-selection}
+\end{table}

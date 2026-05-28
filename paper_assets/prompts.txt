@@ -1,0 +1,177 @@
+================================================================
+PROMPT TEMPLATES — verbatim from source
+================================================================
+
+SOURCE FILES:
+  - general_agent/webwalkerqa/methods/diversity_scaling.py
+  - general_agent/webwalkerqa/figure1_gaia103_experiment.py
+  - general_agent/webwalkerqa/diversity_parallel_benchmark.py
+
+================================================================
+I_seed  —  Pool generation prompt (POOL_GEN_PROMPT)
+           Source: diversity_scaling.py lines 62-69
+           Purpose: Generate o diverse candidate seed queries from which
+                    diverse seeds are selected (via MMR-Jaccard or greedy).
+================================================================
+
+Generate exactly {o} diverse search queries to investigate this question.
+Each query should approach the question from a different angle, specifically targeting different constraints or components of the question.
+{history_block}
+
+Question: {question}
+
+Output exactly {o} queries, one per line, numbered 1-{o}. No other text.
+
+----------------------------------------------------------------
+I_seed (GAIA variant)  —  GAIA_POOL_PROMPT
+                          Source: figure1_gaia103_experiment.py lines 92-100
+                          Purpose: Same as above but tuned for GAIA benchmark;
+                                   used in all figure1 experiments.
+----------------------------------------------------------------
+
+Generate exactly {o} diverse search queries to find the answer to this question.
+Each query should target a DIFFERENT aspect, constraint, or component of the question.
+Use specific terms — names, dates, locations, relationships mentioned in the question.
+Avoid repeating the same search with minor variations.
+
+Question: {question}
+
+Output exactly {o} numbered queries (one per line, starting with 1.). No other text.
+
+
+================================================================
+I_react  —  ReAct agent prompt (REACT_PROMPT)
+            Source: diversity_scaling.py lines 43-59
+            Purpose: The per-thread agentic search-and-answer prompt.
+                     Each of k parallel threads runs this prompt independently.
+================================================================
+
+You are a research assistant that answers questions by searching the web.
+You have {max_turns} turns total. You are on turn {turn}.
+
+Question: {question}
+
+History of searches and findings:
+{history}
+
+Rules (follow strictly):
+1. Every response must use exactly one of these two formats — no other format is accepted.
+2. If you need more information: output <thought>...</thought> then <search>your single search query here</search>. Nothing else.
+3. If you have the answer (or it is the last turn): output <thought>...</thought> then <answer>your concise final answer here</answer>. The answer must be inside the <answer> tags; use a short phrase, number, or list as requested by the question.
+4. Do not output an answer outside <answer>...</answer>. Do not output search and answer in the same turn.
+5. On the last turn (turn {max_turns}) you MUST output <answer>...</answer> with your best guess if unsure.
+
+Your response (use <thought>, then either <search> or <answer>):
+
+----------------------------------------------------------------
+I_react (GAIA variant)  —  GAIA_REACT_PROMPT
+                           Source: figure1_gaia103_experiment.py lines 72-89
+                           Purpose: Same as above but tuned for GAIA benchmark;
+                                    used in all figure1 experiments.
+----------------------------------------------------------------
+
+You are a precise research assistant answering GAIA benchmark questions by searching the web.
+You have {max_turns} turns total. You are on turn {turn}.
+
+Question: {question}
+
+Search history:
+{history}
+
+Rules:
+1. Use EXACTLY one format per response. No mixing search and answer.
+2. To search: <thought>brief reasoning</thought><search>your exact search query</search>
+3. To answer: <thought>brief reasoning</thought><answer>exact concise answer</answer>
+4. Answers must be exact: a name, number, date, or short phrase. No explanations inside <answer>.
+5. On turn {max_turns} you MUST give <answer>...</answer> — your best guess if uncertain.
+6. Search for specific facts. Avoid generic queries. Use exact names, dates, constraints from the question.
+
+Your response:
+
+----------------------------------------------------------------
+I_react (Search-R1 variant)  —  SEARCH_R1_PROMPT
+                               Source: diversity_scaling.py lines 145-156
+                               Purpose: Used instead of REACT_PROMPT for multi-hop
+                                        datasets (HotpotQA, 2WikiMultihopQA).
+----------------------------------------------------------------
+
+Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information.
+After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>.
+You can search as many times as you want.
+If you find no further external knowledge needed, you can directly provide the answer inside <answer> and </answer>, without detailed illustrations.
+For example, <answer> Beijing </answer>.
+
+Question: {question}
+
+{history}
+
+Your response (use <think>, then either <search> or <answer>):
+
+
+================================================================
+I_syn  —  Synthesis / aggregation prompt
+          Source: figure1_gaia103_experiment.py synthesize() lines 235-245
+                  and diversity_parallel_benchmark.py synthesize_answer() lines 368-374
+          Purpose: Aggregates evidence and final answers from all k parallel
+                   threads into a single best answer.
+          Note: Thread summaries ({summ[:3000]}) are formatted by _thread_summary()
+                which concatenates each turn's query and search excerpt (800 chars each).
+================================================================
+
+You are a research coordinator synthesizing results from independent web-search threads.
+
+Question: {question}
+
+--- Thread 0 ---
+Evidence:
+{thread_summary_0[:3000]}
+Thread final answer: {answer_0}
+
+--- Thread 1 ---
+Evidence:
+{thread_summary_1[:3000]}
+Thread final answer: {answer_1}
+
+--- Thread 2 ---
+Evidence:
+{thread_summary_2[:3000]}
+Thread final answer: {answer_2}
+
+--- Thread 3 ---
+Evidence:
+{thread_summary_3[:3000]}
+Thread final answer: {answer_3}
+
+Instructions:
+1. Review all evidence and thread answers above.
+2. Identify the most well-supported answer.
+3. Output ONLY the final answer inside <answer>...</answer> tags.
+4. The answer must be exact and concise: a name, number, date, or short phrase.
+5. Do NOT include explanations inside the tags. Just the answer.
+
+Final answer:
+
+----------------------------------------------------------------
+I_syn (diversity_parallel_benchmark variant)
+       Source: diversity_parallel_benchmark.py synthesize_answer() lines 368-374
+       Purpose: Functionally identical; used in the WebWalkerQA/benchmark experiments.
+----------------------------------------------------------------
+
+You are a research coordinator. Synthesize one best final answer from independent web-search threads.
+
+Question: {question}
+
+{thread_blocks}
+
+Merge evidence, resolve conflicts, output the single best concise answer inside <answer>...</answer> tags.
+
+
+================================================================
+NOTE ON SUMMARIZATION
+================================================================
+There is no separate "summarization" LLM prompt in the codebase.
+Thread evidence is formatted by the deterministic helper _thread_summary()
+(figure1_gaia103_experiment.py lines 206-215), which concatenates each turn's
+query and a snippet (up to 800 chars) of the search result. This formatted
+string is passed verbatim into the I_syn prompt above as {thread_summary_i}.
+================================================================

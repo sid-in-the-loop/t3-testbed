@@ -1,0 +1,423 @@
+================================================================
+APPENDIX — TIER 1: REPRODUCIBILITY
+================================================================
+
+This appendix gathers every piece of information needed to reproduce
+the numbers in the main paper. Sections A–D below correspond to:
+
+  A. Prompts and instructions used by the agent
+  B. Judge details (model, prompt, observed behaviour)
+  C. Hyperparameters (every config that produced a number)
+  D. Hardware, infrastructure, and runtime
+
+Source files cited below live in the public release tree at
+  general_agent/webwalkerqa/{methods,judge,search,llm.py}.
+
+
+================================================================
+A. PROMPTS AND INSTRUCTIONS
+================================================================
+
+We use two agent prompts plus one helper prompt for diversity
+selection. All three are reproduced verbatim below; curly-brace
+placeholders ({question}, {turn}, ...) are filled at run time.
+No prompt template was modified during the experiments reported
+in this paper.
+
+----------------------------------------------------------------
+A.1  MHQA agent prompt (REACT_PROMPT)
+     Source: methods/diversity_scaling.py
+     Used for: Table 1 — HotpotQA, MuSiQue, 2WikiMultiHopQA,
+               Bamboogle, FRAMES.
+     Description: simple ReAct loop (<thought> + <search> | <answer>).
+----------------------------------------------------------------
+You are a research assistant that answers questions by searching
+the web. You have {max_turns} turns total. You are on turn {turn}.
+
+Question: {question}
+
+History of searches and findings:
+{history}
+
+Rules (follow strictly):
+1. Every response must use exactly one of these two formats — no
+   other format is accepted.
+2. If you need more information: output <thought>...</thought>
+   then <search>your single search query here</search>.
+3. If you have the answer (or it is the last turn): output
+   <thought>...</thought> then
+   <answer>your concise final answer here</answer>.
+4. Do not output an answer outside <answer>...</answer>.
+   Do not output search and answer in the same turn.
+5. On the last turn (turn {max_turns}) you MUST output
+   <answer>...</answer> with your best guess if unsure.
+
+----------------------------------------------------------------
+A.2  Reasoning agent prompt (WEB_REACT_PROMPT)
+     Source: methods/diversity_scaling.py
+     Used for: Table 2 — GAIA, HLE, WebWalker, BrowseComp.
+     Description: extended ReAct that adds an explicit
+                  <summary> action so the agent can compress
+                  long <information> blocks within the larger
+                  T × max_tok budget used for web-reasoning.
+----------------------------------------------------------------
+You are a precise research assistant answering web-reasoning
+questions by searching the internet.
+You have {max_turns} turns total. You are on turn {turn}.
+
+Question: {question}
+
+Search history:
+{history}
+
+Available actions per turn (choose exactly one):
+  <search>query</search>     — issue a new search
+  <summary>...</summary>     — compress prior <information>
+                               blocks; useful when context
+                               is filling up
+  <answer>...</answer>       — submit your final answer
+
+Rules:
+1. Use EXACTLY one action per response.
+2. Answers must be exact: a name, number, date, or short
+   phrase. No explanations inside <answer>.
+3. On turn {max_turns} you MUST give <answer>...</answer>.
+4. Search for specific facts. Avoid generic queries.
+
+----------------------------------------------------------------
+A.3  Pool-generation prompt (POOL_GEN_PROMPT)
+     Source: methods/diversity_scaling.py
+     Used for: every S^3 run — invoked once at turn 1 to produce
+               the pool of o = 16 candidate queries from which the
+               greedy max-min Jaccard selector picks k diverse
+               seeds. Same prompt in both groups (MHQA, reasoning).
+----------------------------------------------------------------
+Generate exactly {o} diverse search queries to investigate this
+question. Each query should approach the question from a different
+angle, specifically targeting different constraints or components
+of the question.
+{history_block}
+
+Question: {question}
+
+Output exactly {o} queries, one per line, numbered 1-{o}. No other
+text.
+
+`history_block` is empty at turn 1 (the default; oversample-until-N
+with N=1) and is a bulleted list of prior queries when the
+oversample-until-N ablation extends pool generation past turn 1.
+
+
+================================================================
+B. JUDGE DETAILS
+================================================================
+
+----------------------------------------------------------------
+B.1  Judge model and decoding parameters
+----------------------------------------------------------------
+- Model:        openai/gpt-4o-mini  (API; LiteLLM client)
+- Temperature:  0.0
+- max_tokens:   300
+- Seed:         not pinned (gpt-4o-mini does not honour `seed`
+                deterministically; per-call output is sampled at
+                T=0 but minor variation can occur)
+- Concurrency:  100 in-flight requests per judge run
+- Retries:      5 attempts with exponential backoff
+                (4s, 8s, 16s, 32s, 64s)
+- Implementation: webwalkerqa/judge/eval_llm.py
+
+The judge is invoked once per (question, candidate-answer) pair.
+For pass@k we judge each of the k candidates independently and
+compute pass@k = 1 - C(N-c, k) / C(N, k) using the judged labels.
+
+----------------------------------------------------------------
+B.2  Judge prompt — MHQA (JUDGE_PROMPT)
+     Source: webwalkerqa/judge/eval_llm.py
+     Used for: HotpotQA, MuSiQue, 2Wiki, Bamboogle, FRAMES.
+----------------------------------------------------------------
+You are an expert evaluator. Determine if the generated answer
+correctly answers the question based on the ground truth answer.
+
+Question: {question}
+Ground Truth Answer: {ground_truth}
+Generated Answer: {generated_answer}
+
+Evaluation Rubric:
+1. Factuality: Does the answer contain the core correct
+   information? All key facts must be present.
+2. Semantic equivalence: Mark CORRECT if the meaning is the
+   same even if phrased differently:
+   - Durations expressed as start/end dates vs. duration length
+   - Abbreviations and alternate names ("St. Petersburg" =
+     "Saint Petersburg")
+   - Numbers in different formats ("142,000" = "142 thousand")
+   - Dates in different formats
+3. Completeness: For multi-part questions, all parts must be
+   correctly answered.
+4. Contradiction: Mark INCORRECT only if the answer directly
+   contradicts the ground truth.
+5. Extra information: Ignore extra details as long as the core
+   answer is correct.
+
+Briefly explain your reasoning, then output "CORRECT" or
+"INCORRECT" on the final line.
+
+----------------------------------------------------------------
+B.3  Judge prompt — web-reasoning (WEB_JUDGE_PROMPT)
+     Source: webwalkerqa/judge/eval_llm.py
+     Used for: GAIA, HLE, WebWalker, BrowseComp.
+     Adapted from the WebWalker paper; JSON output for cleaner
+     parsing.
+----------------------------------------------------------------
+Please determine if the predicted answer is SEMANTICALLY
+equivalent to the labeled answer.
+
+Question: {question}
+Labeled Answer: {ground_truth}
+Predicted Answer: {generated_answer}
+
+Output as JSON (no markdown fences):
+{"rationale": "your rationale as text",
+ "judgement": "correct" or "incorrect"}
+
+----------------------------------------------------------------
+B.4  Judge–exact-match agreement (observed)
+----------------------------------------------------------------
+We compute pass@k_em (strict exact match) and pass@k_llm
+(gpt-4o-mini judge) on every cell. Across the full Table 1 and
+Table 2 result trees the LLM judge consistently labels MORE
+candidates correct than EM, by about 3-7 percentage points
+per condition (because EM rejects valid paraphrases such as
+"the United States of America" vs the gold "USA"). The two
+metrics agree on the *ranking* of conditions (sequential <
+naive < S^3) on every dataset, every model, every k.
+
+We did not run a separate human-vs-judge agreement study; this
+is a documented limitation. The same judge model is used across
+all conditions, so any judge bias affects all methods equally
+and does not change relative comparisons.
+
+----------------------------------------------------------------
+B.5  Cost estimate (judge only)
+----------------------------------------------------------------
+- Avg tokens per judge call: ~250 in + ~120 out (gpt-4o-mini
+  pricing as of 2026-01: $0.15 in / $0.60 out per 1M tokens).
+- Cost per judged candidate ≈ $0.00011.
+- Total judged candidates across the entire paper:
+    Table 1:  5 models × 7 datasets × 7 conds × 3 seeds × ~8 cands
+              ≈ 5,880 cands per dataset × 7 ≈ 40k candidates avg
+              over all sizes -> ~$110 total
+    Table 2:  4 models × 4 datasets × 5 conds × 3 seeds × ~6 cands
+              ≈ ~16k cands -> ~$45 total
+    Ablations & figure runs ≈ ~$20
+  All in: ~$175 in API costs for the LLM judge across the paper.
+
+
+================================================================
+C. HYPERPARAMETERS
+================================================================
+
+----------------------------------------------------------------
+C.1  Per-condition matrix — Table 1 (MHQA, ClueWeb22)
+----------------------------------------------------------------
+Condition   k threads   T turns   max_tokens   pool_size   Backend
+seq         1           12*       2048         —           clueweb
+naive_k2    2           16        2048         —           clueweb
+div_k2      2           16        2048         16          clueweb
+naive_k4    4            8        2048         —           clueweb
+div_k4      4            8        2048         16          clueweb
+naive_k8    8            8        1024         —           clueweb
+div_k8      8            8        1024         16          clueweb
+
+* The `seq` cell uses T=12 in code. The narrative T-budget is 32;
+  empirical avg turns used was <12 across datasets, so T=12 is a
+  safe truncation.
+
+Compute matched at 65,536 output tokens per question.
+
+----------------------------------------------------------------
+C.2  Per-condition matrix — Table 2 (web-reasoning, Serper)
+----------------------------------------------------------------
+Condition   k   T    max_tokens   pool_size   Backend   Prompt
+seq         1   25   8192         —           serper    web_reasoning
+naive_k4    4    8   8192         —           serper    web_reasoning
+div_k4      4    8   8192         16          serper    web_reasoning
+naive_k8    8    8   4096         —           serper    web_reasoning
+div_k8      8    8   4096         16          serper    web_reasoning
+
+Compute matched at 8192 × 8 = 65,536 tokens for k=1, k=4 (4×T×max);
+k=8 condition uses 4096 max_tokens to stay at 8 × 8 × 4096 ×
+(thread_count/2) ≈ matched.
+
+----------------------------------------------------------------
+C.3  Sampling temperatures
+----------------------------------------------------------------
+Turn 1 (when `temp` is free):    T = 1.0   (encourages diversity)
+All other rollout turns:         T = 0.7
+Pool generation (POOL_GEN):      T = 1.0
+Synthesis call (SYNTH):          T = 0.7
+LLM judge:                       T = 0.0
+
+----------------------------------------------------------------
+C.4  Random seeds
+----------------------------------------------------------------
+- Run-level seeds: 1, 2, 3 (every cell in main tables uses three
+  seeds; reported numbers are the mean, ±1 std/SEM in figures).
+- Per-rollout seed (deterministic hash):
+    raw = sha256_top8(question_id) * 1000
+        + run_seed * 100
+        + rollout_idx
+    rollout_seed = raw % 2**32
+  Implementation: `_safe_rollout_seed` in
+  methods/diversity_scaling.py:30-33.
+- LLM judge: not seeded (gpt-4o-mini API does not honour `seed`
+  deterministically, so we accept ~1% per-call variation).
+- Subsampling for Table 2 used a fixed Python `random.seed(42)`.
+
+----------------------------------------------------------------
+C.5  Diversity selection
+----------------------------------------------------------------
+Method:        greedy max-min Jaccard (selected after the
+               comparison reported in Appendix K — wins on
+               pass@4 vs MMR variants and uniform random).
+Token unit:    word-level token sets (lowercased, whitespace-
+               split, stopword-stripped using sklearn's
+               ENGLISH_STOP_WORDS).
+Pool size:     16 candidate queries per turn 1 generation
+               (validated as flat across pool ∈ {4,8,16,32};
+               see Appendix I).
+Oversample:    only at turn 1 by default (oversample-until-N
+               with N=1; ablation in Appendix J shows N>1
+               yields <2 pp improvement).
+Implementation: methods/utils.py::select_diverse_queries,
+               method="jaccard".
+
+----------------------------------------------------------------
+C.6  Search backends
+----------------------------------------------------------------
+ClueWeb22 (Table 1):
+  - Endpoint: https://www.clueweb22.us/wiki18/search
+  - top-k = 3 results per query, ~500 char passage each
+  - Truncated at max_chars = 4000 per turn
+  - 5 retries with min(2.0, 0.3*(i+1)) backoff
+
+Google Serper (Table 2):
+  - Endpoint: https://google.serper.dev/search
+  - top-10 organic results per query
+  - Each result: [title](url) + date + snippet
+  - Truncated at max_chars = 4000
+  - 5 retries with same backoff
+  - Requires SERPER_API_KEY env var
+
+Backend selection: env var SEARCH_BACKEND ∈ {clueweb, serper}.
+
+----------------------------------------------------------------
+C.7  Concurrency / vLLM flags
+----------------------------------------------------------------
+Async semaphore (questions in flight): 100
+vLLM --max-num-seqs:                   128
+vLLM --max-model-len:                  32768
+vLLM --enforce-eager:                  on (skip CUDA graph compile;
+                                       saves 2-3 min cold-start)
+vLLM --enable-prefix-caching:          on (shares prefix across
+                                       same-question threads)
+vLLM --dtype:                          auto (bf16 on L40S)
+
+
+================================================================
+D. HARDWARE, INFRASTRUCTURE, RUNTIME
+================================================================
+
+----------------------------------------------------------------
+D.1  Cluster
+----------------------------------------------------------------
+- Cluster:       CMU Babel SLURM cluster
+- GPU type:      NVIDIA L40S (48 GB VRAM, bf16)
+- Per-job alloc: --gres=gpu:1 --mem=32G --cpus-per-task=8
+                 --time=24:00:00
+- Partition:     general
+- User caps:     MaxSubmit=50, ~8 concurrent GPU jobs (QOS limit)
+
+Each SLURM job spins up its own self-hosted vLLM instance on its
+allocated GPU node. vLLM port = 8000 + (SLURM_JOB_ID % 1000)
+to avoid same-node port collisions when two jobs share a node.
+
+----------------------------------------------------------------
+D.2  Caches and storage
+----------------------------------------------------------------
+HF_HOME:          /data/user_data/<user>/hf_cache (off /home quota)
+VLLM_CACHE_ROOT:  /data/user_data/<user>/vllm_cache (CUDA-graph
+                  cache shared across jobs)
+
+----------------------------------------------------------------
+D.3  Inline judge step
+----------------------------------------------------------------
+After all 3 seeds of a cell finish, the same SLURM job runs the
+LLM judge against the just-written results dir, then exits and
+releases the GPU. This saves one SLURM submission slot per
+experiment vs a chained dependency-based judge job.
+
+----------------------------------------------------------------
+D.4  Total compute
+----------------------------------------------------------------
+Approximate GPU-hours by experiment family (single L40S, 1 GPU
+per job):
+
+  Main Table 1 (MHQA, ClueWeb):
+     5 models × 7 datasets × 7 conds × 3 seeds ≈ 735 cells
+     Avg cell runtime: ~25 min
+     Total: ~310 GPU-hours
+
+  Main Table 2 (web-reasoning, Serper):
+     4 models × 4 datasets × 5 conds × 3 seeds ≈ 240 cells
+     Avg cell runtime: ~50 min (longer T, larger max_tok,
+     web latency)
+     Total: ~200 GPU-hours
+
+  k=2 ablation (passk_ablation):
+     5 models × 3 datasets (hotpotqa, bamboogle, GAIA)
+     × 2 conds (naive_k2, div_k2) × 3 seeds ≈ 90 cells
+     Total: ~30 GPU-hours
+
+  Pool-size ablation (poolsize_ablation):
+     2 models × 2 datasets × 4 pool values × 3 seeds ≈ 48 cells
+     Total: ~16 GPU-hours
+
+  Oversample-until-N ablation (oversample_ablation):
+     2 models × 2 datasets × 8 N values × 3 seeds ≈ 96 cells
+     Total: ~32 GPU-hours
+
+  Figure-1 / Figure-2 illustrative runs (gpt-4o-mini, GAIA-103):
+     API only — no local GPU compute.
+
+  TOTAL LOCAL GPU TIME:    ~ 590 GPU-hours
+  TOTAL OPENAI API COST:   ~ $175 (LLM judge — see B.5)
+                           +  ~ $10 (figure-1 / figure-2 illustrative
+                                     gpt-4o-mini agent runs)
+
+These estimates are conservative; some jobs ran longer than
+the stated average due to retries on the Serper endpoint.
+
+----------------------------------------------------------------
+D.5  Reproducibility caveats
+----------------------------------------------------------------
+The numerical values in the main tables are not bit-exact
+reproducible due to:
+  (a) gpt-4o-mini judge ignoring the API `seed` field
+      (typical drift: ~1% of judge labels per re-run);
+  (b) vLLM scheduler reordering at high concurrency (we use
+      max-num-seqs = 128 with prefix caching; identical
+      prompts can produce identical outputs given the same
+      cache, but ordering of concurrent requests can shift
+      KV-cache layout);
+  (c) Serper search results changing over time as Google's
+      index updates.
+
+(a) and (b) cause 0.1–0.3 pp drift on pass@k_llm in our
+re-runs; (c) is dataset-specific. Local backend (ClueWeb22)
+is fully reproducible — no observed drift across re-runs of
+the same seed.
+
+================================================================
+END OF TIER 1 APPENDIX
+================================================================

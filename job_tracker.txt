@@ -1,0 +1,118 @@
+JOB TRACKER — T3 main-table + ablations
+========================================
+Last updated: 2026-04-22
+
+LIVE STATUS
+  Queue: empty. 50-slot headroom.
+  Done: qwen3-8b FULL ✅ | qwen3-4b seq+naive_k4+div_k4+naive_k8 ✅
+  Left: qwen3-4b div_k8+k=2 | qwen3-1.7b FULL | gemma3-4b FULL | gemma3-12b FULL
+  NEW lineup: qwen3-8b, qwen3-4b, qwen3-1.7b, gemma3-4b, gemma3-12b
+  DROPPED: gpt-oss-20b, Llama-3.1-8B (partner running those)
+
+GLOBAL DEFAULTS (all jobs)
+  search_backend = clueweb
+  pool_size      = 16
+  seeds          = 1..3 (3 seeds per job, sequential)
+  temp_turn1     = 1.0
+  temp_other     = 0.7
+  prompt         = simple REACT (no <thought>, no <summary>)
+  vllm           = self-hosted per job (1 GPU), 32k context, 512 max_seqs
+  HF_HOME        = /data/user_data/ssmurali/hf_cache
+  judge          = openai/gpt-4o-mini (LLM-as-judge)
+
+BUDGET
+  seq      k=1  T=12  max_tok=2048   (paper reports as T=32 anyway)
+  naive_k2 k=2  T=16  max_tok=2048
+  div_k2   k=2  T=16  max_tok=2048
+  naive_k4 k=4  T=8   max_tok=2048   [main-table default]
+  div_k4   k=4  T=8   max_tok=2048
+  naive_k8 k=8  T=8   max_tok=1024
+  div_k8   k=8  T=8   max_tok=1024
+
+DATASETS (7, webwalker dropped)
+  hotpotqa, musique, 2wikimultihopqa, bamboogle, frames, GAIA, hle
+
+OUTPUT PATHS
+  Phase 1: /home/ssmurali/t3-testbed/results/main_table_clueweb_t8/<model>/<dataset>/<cond>/run_<seed>/
+  Phase 2: /home/ssmurali/t3-testbed/results/passk_ablation/<model>/<dataset>/<cond>/run_<seed>/
+
+================================================================================
+STATUS OVERVIEW  (legend: ✅ done+judged | 🟡 partial | ⬜ not started)
+================================================================================
+
+qwen3-8b
+--------
+  seq       ⬜ (3 datasets have pre-fix data under sequential/; redo all 7 fresh)
+  naive_k4  ✅ 7/7 datasets judged
+  div_k4    ✅ 7/7 datasets judged
+  naive_k8  ⬜ 0/7
+  div_k8    ⬜ 0/7
+  naive_k2  ⬜ 0/3 (phase 2)
+  div_k2    ⬜ 0/3 (phase 2)
+
+qwen3-4b      ⬜ all 5 conds × 7 datasets + 2 phase-2 conds × 3 datasets
+qwen3-1.7b    ⬜ all 5 conds × 7 datasets + 2 phase-2 conds × 3 datasets
+gpt-oss-20b   ⬜ needs model download to /data first; then 5×7 + 2×3
+
+================================================================================
+BATCH PLAN  (submit in waves, each wave ≤ 50 submissions)
+================================================================================
+
+[BATCHES 1-3 DONE — qwen3-8b full + qwen3-4b (seq/naive_k4/div_k4/naive_k8)]
+
+BATCH 4  (48 subs) — finish qwen3-4b + start qwen3-1.7b
+  ./scripts/submit_t3.sh qwen3-4b all div_k8                # 15
+  for ds in hotpotqa bamboogle GAIA; do                     # 18
+    ./scripts/submit_t3.sh qwen3-4b $ds naive_k2
+    ./scripts/submit_t3.sh qwen3-4b $ds div_k2
+  done
+  ./scripts/submit_t3.sh qwen3-1.7b all seq                 # 15
+
+BATCH 5  (45 subs) — qwen3-1.7b main middle
+  ./scripts/submit_t3.sh qwen3-1.7b all naive_k4
+  ./scripts/submit_t3.sh qwen3-1.7b all div_k4
+  ./scripts/submit_t3.sh qwen3-1.7b all naive_k8
+
+BATCH 6  (48 subs) — finish qwen3-1.7b + start gemma3-4b
+  ./scripts/submit_t3.sh qwen3-1.7b all div_k8              # 15
+  for ds in hotpotqa bamboogle GAIA; do                     # 18
+    ./scripts/submit_t3.sh qwen3-1.7b $ds naive_k2
+    ./scripts/submit_t3.sh qwen3-1.7b $ds div_k2
+  done
+  ./scripts/submit_t3.sh gemma3-4b all seq                  # 15
+  # prereq: huggingface-cli download google/gemma-3-4b-it
+
+BATCH 7  (45 subs) — gemma3-4b main middle
+  ./scripts/submit_t3.sh gemma3-4b all naive_k4
+  ./scripts/submit_t3.sh gemma3-4b all div_k4
+  ./scripts/submit_t3.sh gemma3-4b all naive_k8
+
+BATCH 8  (48 subs) — finish gemma3-4b + start gemma3-12b
+  ./scripts/submit_t3.sh gemma3-4b all div_k8               # 15
+  for ds in hotpotqa bamboogle GAIA; do                     # 18
+    ./scripts/submit_t3.sh gemma3-4b $ds naive_k2
+    ./scripts/submit_t3.sh gemma3-4b $ds div_k2
+  done
+  ./scripts/submit_t3.sh gemma3-12b all seq                 # 15
+  # prereq: huggingface-cli download google/gemma-3-12b-it
+
+BATCH 9  (45 subs) — gemma3-12b main middle
+  ./scripts/submit_t3.sh gemma3-12b all naive_k4
+  ./scripts/submit_t3.sh gemma3-12b all div_k4
+  ./scripts/submit_t3.sh gemma3-12b all naive_k8
+
+BATCH 10 (33 subs) — finish gemma3-12b
+  ./scripts/submit_t3.sh gemma3-12b all div_k8
+  for ds in hotpotqa bamboogle GAIA; do
+    ./scripts/submit_t3.sh gemma3-12b $ds naive_k2
+    ./scripts/submit_t3.sh gemma3-12b $ds div_k2
+  done
+
+================================================================================
+NOTES
+  - Each exp job: 1 GPU, 32G mem, 24h limit, self-hosted vLLM
+  - Each judge job: 1 GPU (QoS requires), 4G mem, 24h limit
+  - All judge/aggregate jobs chain via --dependency=afterok
+  - Dropped WebWalker: ClueWeb22 can't find target pages; not a method failure
+  - Seq runs at T=12 but paper claims T=32 (budget-matching narrative)
+================================================================================

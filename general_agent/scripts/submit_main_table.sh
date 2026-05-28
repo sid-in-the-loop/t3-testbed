@@ -17,19 +17,21 @@ cd "$(dirname "$0")/.."
 mkdir -p logs/main_table logs/judge
 
 DATA_DIR="/home/ssmurali/t3-testbed/general_agent/data/main_table"
-RESULTS_BASE="/home/ssmurali/t3-testbed/results/main_table_t12"
-TURNS=12
 ALL_CONDITIONS=("sequential" "naive_parallel" "diversity_parallel")
 SEEDS=(1 2 3 4 5)
 ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "GAIA" "hle" "webwalker")
 
-CONDA_INIT="source /data/user_data/ssmurali/miniconda3/etc/profile.d/conda.sh && conda activate t3 && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH"
+CONDA_INIT="source /data/user_data/ssmurali/miniconda3/etc/profile.d/conda.sh && conda activate t3 && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH && set -a && source /home/ssmurali/t3-testbed/general_agent/.env && set +a"
 RUN_CMD="cd /home/ssmurali/t3-testbed/general_agent"
 
 # Optional filters
 MODEL_SHORT="${1:-gpt-4o-mini}"
 FILTER_DATASET="${2:-}"
 FILTER_COND="${3:-}"
+POOL_SIZE="${4:-8}"  # diversity pool size (default 8, try 16 or 24)
+TURNS="${5:-12}"    # turns per parallel thread (seq gets k× this)
+
+RESULTS_BASE="/home/ssmurali/t3-testbed/results/main_table_t${TURNS}"
 
 declare -A MODEL_LITELLM_MAP
 MODEL_LITELLM_MAP["gpt-4o-mini"]="openai/gpt-4o-mini"
@@ -69,6 +71,7 @@ for DATASET in "${ALL_DATASETS[@]}"; do
       INNER+=" --seed ${SEED}"
       INNER+=" --max-turns-par ${TURNS}"
       INNER+=" --max-concurrent 100"
+      INNER+=" --pool-size ${POOL_SIZE}"
       INNER+=" --output-dir ${OUTDIR}"
       INNER+=" && "
     done
@@ -79,7 +82,7 @@ for DATASET in "${ALL_DATASETS[@]}"; do
       --job-name="${JOB_NAME}" \
       --partition=general \
       --gres=gpu:1 \
-      --time=48:00:00 \
+      --time=24:00:00 \
       --mem=16G \
       --cpus-per-task=4 \
       --export=ALL \

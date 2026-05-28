@@ -18,6 +18,42 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# Optional aliases -> LiteLLM model string (for CLI convenience)
+_MODEL_ALIASES = {
+    "gpt-4o-mini": "openai/gpt-4o-mini",
+    "gpt4o-mini": "openai/gpt-4o-mini",
+    "gpt-4.1-mini": "openai/gpt-4.1-mini",
+    "gpt4.1-mini": "openai/gpt-4.1-mini",
+    "gpt-5-nano": "openai/gpt-5-nano",
+    "gemini-2.5-flash": "gemini/gemini-2.5-flash",
+    "gemini-3-flash-preview": "gemini/gemini-3-flash-preview",
+    "qwen3-1.7b": "openai/Qwen/Qwen3-1.7B",
+    "qwen3-4b": "openai/Qwen/Qwen3-4B",
+    "qwen3-8b": "openai/Qwen/Qwen3-8B",
+    "qwq-32b": "openai/Qwen/QwQ-32B-Preview",
+    "gemma3-4b": "openai/google/gemma-3-4b-it",
+    "gemma3-12b": "openai/google/gemma-3-12b-it",
+}
+
+# Module-level default api_base for vLLM routing
+_DEFAULT_API_BASE: Optional[str] = None
+
+
+def set_api_base(base: Optional[str]):
+    """Set the default api_base for all LLM calls (used for vLLM endpoints)."""
+    global _DEFAULT_API_BASE
+    _DEFAULT_API_BASE = base
+
+
+def normalize_model(model: str) -> str:
+    """Return LiteLLM model string; resolve alias if present (e.g. gpt4.1-mini -> openai/gpt-4.1-mini)."""
+    s = (model or "").strip()
+    if not s:
+        return "openai/gpt-4o-mini"
+    if "/" in s:
+        return s
+    return _MODEL_ALIASES.get(s.lower(), f"openai/{s}")
+
 
 async def call_llm(
     messages: list[dict],
@@ -25,6 +61,7 @@ async def call_llm(
     max_tokens: int = 1024,
     temperature: float = 0.7,
     seed: Optional[int] = None,
+    api_base: Optional[str] = None,
 ) -> tuple[str, int, int]:
     """
     Call LLM and return (text_content, prompt_tokens, output_tokens).
@@ -51,25 +88,75 @@ async def call_llm(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
+    # Resolve api_base: explicit param > module default > None
+    effective_base = api_base or _DEFAULT_API_BASE
+    if effective_base:
+        kwargs["api_base"] = effective_base
     if seed is not None:
-        kwargs["seed"] = seed
+        # APIs (e.g. OpenAI) require seed in [0, 2**32 - 1]
+        seed_val = int(seed) % (2**32)
+        kwargs["seed"] = seed_val
 
-    # Retry logic (same pattern as existing codebase)
+    # Gemini: ensure max_tokens is not dropped; some LiteLLM versions map it to maxOutputTokens
+    # only when present. Explicitly set so Gemini doesn't fall back to a low default or truncate.
+    if "gemini" in model.lower():
+        kwargs["max_output_tokens"] = max_tokens
+
+    # Qwen3: disable thinking mode to avoid long <think> chains that waste tokens/time
+    if "qwen3" in model.lower():
+        kwargs["extra_body"] = {"chat_template_kwargs": {"enable_thinking": False}}
+
+    # Retry logic with error-type awareness:
+    #   - ContextWindowExceededError: retryable once after halving message content
+    #     (keep system + most recent half) — persistent oversize means we give up
+    #   - Connection/InternalServer/RateLimit: retry up to 5x with exponential backoff
+    #   - Other errors: retry up to 5x (legacy behavior)
     last_exc = None
+    context_truncated = False
     for attempt in range(5):
         try:
             response = await litellm.acompletion(**kwargs)
             break
         except Exception as e:
             last_exc = e
+            err_name = type(e).__name__
+            # Non-retryable if it's a context overflow AND we've already tried truncating
+            if "ContextWindowExceeded" in err_name:
+                if not context_truncated:
+                    # Halve the longest user/assistant message (drop middle portion)
+                    msgs = kwargs.get("messages", [])
+                    if msgs:
+                        longest_idx = max(range(len(msgs)), key=lambda i: len(str(msgs[i].get("content", ""))))
+                        content_str = str(msgs[longest_idx].get("content", ""))
+                        if len(content_str) > 1000:
+                            half = len(content_str) // 2
+                            keep_head = content_str[: half // 2]
+                            keep_tail = content_str[-(half // 2):]
+                            msgs[longest_idx] = {**msgs[longest_idx], "content": keep_head + "\n[...truncated...]\n" + keep_tail}
+                            context_truncated = True
+                            continue
+                # Already truncated once or nothing to truncate -> give up
+                raise
             if attempt < 4:
-                wait = min(8.0 * (2 ** attempt), 64.0)
+                # Longer backoff for connection/5xx errors (server might be warming up)
+                is_conn = any(s in err_name for s in ("Connection", "InternalServer", "Timeout", "ServiceUnavailable"))
+                base = 16.0 if is_conn else 8.0
+                wait = min(base * (2 ** attempt), 120.0)
                 await asyncio.sleep(wait)
     else:
         raise last_exc
 
     choice = response.choices[0]
     content = choice.message.content or ""
+
+    # gpt-oss-20b uses the Harmony format: responses are prefixed with
+    # <|channel|>final<|message|> before the actual content.
+    # Scan for that header and return only what comes after it.
+    if "gpt-oss-20b" in model.lower():
+        if "<|channel|>" in content and "<|message|>" in content:
+            after_channel = content.split("<|channel|>", 1)[1]
+            channel_name, after_msg = after_channel.split("<|message|>", 1)
+            content = after_msg if channel_name.strip() == "final" else ""
 
     usage = getattr(response, "usage", None)
     prompt_tokens = getattr(usage, "prompt_tokens", 0) if usage else 0

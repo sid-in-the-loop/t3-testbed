@@ -52,6 +52,27 @@ Evaluation Rubric:
 Briefly explain your reasoning, then output "CORRECT" or "INCORRECT" on the final line."""
 
 
+# Web-task judge prompt (from WebWalker/arXiv reference). Shorter rubric, explicit JSON output.
+WEB_JUDGE_PROMPT = """Please determine if the predicted answer is SEMANTICALLY equivalent to the labeled answer.
+
+Question: {question}
+Labeled Answer: {ground_truth}
+Predicted Answer: {generated_answer}
+
+Output as JSON (no markdown fences):
+{{"rationale": "your rationale as text", "judgement": "correct" or "incorrect"}}"""
+
+
+# Module-level override; CLI flag switches it.
+_JUDGE_PROMPT_STYLE = "mhqa"
+
+
+def set_judge_prompt_style(style: str) -> None:
+    global _JUDGE_PROMPT_STYLE
+    assert style in ("mhqa", "web"), f"bad judge style: {style}"
+    _JUDGE_PROMPT_STYLE = style
+
+
 async def judge_answer(
     question: str,
     ground_truth: str,
@@ -62,11 +83,18 @@ async def judge_answer(
     if not generated_answer or not str(generated_answer).strip():
         return False
 
-    prompt = JUDGE_PROMPT.format(
-        question=question,
-        ground_truth=ground_truth,
-        generated_answer=str(generated_answer),
-    )
+    if _JUDGE_PROMPT_STYLE == "web":
+        prompt = WEB_JUDGE_PROMPT.format(
+            question=question,
+            ground_truth=ground_truth,
+            generated_answer=str(generated_answer),
+        )
+    else:
+        prompt = JUDGE_PROMPT.format(
+            question=question,
+            ground_truth=ground_truth,
+            generated_answer=str(generated_answer),
+        )
 
     async def _call():
         try:
@@ -76,6 +104,16 @@ async def judge_answer(
                 max_tokens=300,
                 temperature=0.0,
             )
+            # Web judge: JSON output with "judgement": "correct"/"incorrect"
+            if _JUDGE_PROMPT_STYLE == "web":
+                import re
+                m = re.search(r'"judgement"\s*:\s*"(correct|incorrect)"', response, re.IGNORECASE)
+                if m:
+                    return m.group(1).lower() == "correct"
+                # Fallback: scan text
+                resp_low = response.lower()
+                return "incorrect" not in resp_low and "correct" in resp_low
+            # MHQA judge: last-line CORRECT/INCORRECT
             lines = response.strip().split("\n")
             for line in reversed(lines):
                 line = line.strip().upper()
@@ -286,7 +324,12 @@ async def main():
                         help="Re-judge even if pass_at_1_llm already exists")
     parser.add_argument("--run-dir", default="",
                         help="Judge a single flat run dir directly (skips nested structure requirement)")
+    parser.add_argument("--judge-prompt-style", default="mhqa", choices=["mhqa", "web"],
+                        help="Judge prompt template. mhqa (default) = current. web = WebWalker-paper JSON-output prompt for Table 2 hard-reasoning tasks.")
     args = parser.parse_args()
+
+    # Apply judge style module-level
+    set_judge_prompt_style(args.judge_prompt_style)
 
     # --run-dir mode: judge a flat run dir directly (no nested structure needed)
     if args.run_dir:

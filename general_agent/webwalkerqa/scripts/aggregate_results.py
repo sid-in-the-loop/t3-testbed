@@ -17,8 +17,21 @@ import numpy as np
 import pandas as pd
 
 METRICS = ["pass_at_1_llm", "pass_at_4_llm", "pass_at_1", "pass_at_4"]
-CONDITIONS = ["sequential", "naive_parallel", "diversity_parallel"]
-COND_SHORT = {"sequential": "Seq", "naive_parallel": "Naive", "diversity_parallel": "Div"}
+CONDITIONS = [
+    "sequential", "naive_parallel", "diversity_parallel",  # legacy names
+    "seq", "naive_k2", "div_k2", "naive_k4", "div_k4", "naive_k8", "div_k8",  # new named-by-k
+    # Pool-size ablation
+    "pool_4", "pool_8", "pool_16", "pool_32",
+    # Oversample-until-turn-N ablation
+    "os_1", "os_2", "os_3", "os_4", "os_5", "os_6", "os_7", "os_8",
+]
+COND_SHORT = {
+    "sequential": "Seq", "naive_parallel": "Naive", "diversity_parallel": "Div",
+    "seq": "Seq(1x32)",
+    "naive_k2": "Nv@2", "div_k2": "Dv@2",
+    "naive_k4": "Nv@4", "div_k4": "Dv@4",
+    "naive_k8": "Nv@8", "div_k8": "Dv@8",
+}
 
 
 def drop_outlier(values: List[float]) -> List[float]:

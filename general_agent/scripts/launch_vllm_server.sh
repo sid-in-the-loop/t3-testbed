@@ -39,7 +39,10 @@ ENDPOINT_FILE="/home/ssmurali/t3-testbed/general_agent/results/vllm_servers/${MO
 
 CONDA_INIT="source /data/user_data/ssmurali/miniconda3/etc/profile.d/conda.sh \
   && conda activate t3 \
-  && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH"
+  && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH \
+  && export HF_HOME=/data/user_data/ssmurali/hf_cache \
+  && export HF_HUB_CACHE=/data/user_data/ssmurali/hf_cache/hub \
+  && mkdir -p /data/user_data/ssmurali/hf_cache/hub"
 
 WRAP="${CONDA_INIT} && \
   mkdir -p /home/ssmurali/t3-testbed/general_agent/results/vllm_servers && \

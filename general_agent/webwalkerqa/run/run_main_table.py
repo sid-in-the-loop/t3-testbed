@@ -65,6 +65,12 @@ K         = 4   # parallel threads
 POOL_SIZE = 8  # diversity pool size
 SYNTH_SNIPPET = 800
 
+# Mutable module-level rollout temperatures.  Overridden in main_async() when
+# the CLI passes --temperature; otherwise stay at the canonical defaults
+# (turn-1 = 1.0, later turns = 0.7).
+_REACT_TEMP_FIRST = 1.0
+_REACT_TEMP_REST  = 0.7
+
 
 # ── QPD / ITC helpers ────────────────────────────────────────────────────────
 
@@ -174,10 +180,15 @@ async def synthesize(model: str, question: str, rollouts: List[Dict], answers: L
 # ── Output helpers ───────────────────────────────────────────────────────────
 
 def _save_trajectory(traj_dir: Path, qid: str, data: Dict[str, Any]) -> None:
-    traj_dir.mkdir(parents=True, exist_ok=True)
-    path = traj_dir / f"{qid}.json"
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    # Non-fatal: disk-quota / permission errors should not abort the whole run.
+    # The per-question CSV row still gets written separately.
+    try:
+        traj_dir.mkdir(parents=True, exist_ok=True)
+        path = traj_dir / f"{qid}.json"
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except OSError as e:
+        print(f"\n  [warn] trajectory write failed for {qid}: {type(e).__name__}: {e}")
 
 
 def _write_csv(path: Path, rows: List[Dict], fields: List[str]) -> None:
@@ -245,7 +256,7 @@ async def run_sequential(
                     model=model, question=ex.question, answer_gt=gold,
                     max_turns=max_turns, initial_query=None,
                     rollout_seed=_safe_rollout_seed(qid, run_seed, 0),
-                    question_id=qid, react_temp_first=1.0, react_temp_rest=0.7,
+                    question_id=qid, react_temp_first=_REACT_TEMP_FIRST, react_temp_rest=_REACT_TEMP_REST,
                 )
             pred = (r.get("answer") or "").strip()
             correct = 1 if exact_match(pred, gold) else 0
@@ -315,7 +326,7 @@ async def run_naive_parallel(
                         model=model, question=ex.question, answer_gt=gold,
                         max_turns=max_turns, initial_query=None,
                         rollout_seed=_safe_rollout_seed(qid, run_seed, i),
-                        question_id=qid, react_temp_first=1.0, react_temp_rest=0.7,
+                        question_id=qid, react_temp_first=_REACT_TEMP_FIRST, react_temp_rest=_REACT_TEMP_REST,
                     )
                     for i in range(k)
                 ])
@@ -371,6 +382,15 @@ async def run_naive_parallel(
 
 # ── Condition 3: Diversity Parallel (greedy-Jaccard) ────────────────────────
 
+DIV_FIELDS = [
+    "question_id", "question", "gold_answer",
+    "pool_queries", "selected_queries",
+    "thread_1_answer", "thread_2_answer", "thread_3_answer", "thread_4_answer",
+    "oracle_correct", "synthesis_correct",
+    "jaccard_qpd", "itc", "atc",
+]
+
+
 def _div_fields(k: int) -> List[str]:
     base = ["question_id", "question", "gold_answer", "pool_queries", "selected_queries"]
     base += [f"thread_{i+1}_answer" for i in range(k)]
@@ -381,6 +401,7 @@ def _div_fields(k: int) -> List[str]:
 async def run_diversity_parallel(
     model: str, examples, max_turns: int, sem: asyncio.Semaphore, traj_dir: Path,
     run_seed: int = 0, k: int = 4, pool_size: int = 16,
+    oversample_until_turn: int = 1,
 ) -> List[Dict]:
     rows: List[Dict] = []
     lock = asyncio.Lock()
@@ -393,21 +414,23 @@ async def run_diversity_parallel(
         seeds: List[str] = []
         try:
             async with sem:
-                pool, _, _ = await generate_pool(model, ex.question, POOL_SIZE)
-                seeds = select_diverse_queries(pool, K, method="jaccard",
+                pool, _, _ = await generate_pool(model, ex.question, pool_size)
+                seeds = select_diverse_queries(pool, k, method="jaccard",
                                                seed=_safe_rollout_seed(qid, run_seed, 0))
-                while len(seeds) < K:
+                while len(seeds) < k:
                     seeds.append(pool[len(seeds) % len(pool)])
-                seeds = seeds[:K]
+                seeds = seeds[:k]
 
                 rollouts = await asyncio.gather(*[
                     run_single_rollout(
                         model=model, question=ex.question, answer_gt=gold,
                         max_turns=max_turns, initial_query=seeds[i],
                         rollout_seed=_safe_rollout_seed(qid, run_seed, i),
-                        question_id=qid, react_temp_first=0.7, react_temp_rest=0.7,
+                        question_id=qid, react_temp_first=_REACT_TEMP_FIRST, react_temp_rest=_REACT_TEMP_REST,
+                        oversample_until_turn=oversample_until_turn,
+                        oversample_pool_size=pool_size,
                     )
-                    for i in range(K)
+                    for i in range(k)
                 ])
                 answers = [(r.get("answer") or "").strip() for r in rollouts]
                 oracle = 1 if any(exact_match(a, gold) for a in answers) else 0
@@ -423,10 +446,7 @@ async def run_diversity_parallel(
                 "question_id": qid, "question": ex.question, "gold_answer": gold,
                 "pool_queries": "; ".join(p.replace(";", ",") for p in pool),
                 "selected_queries": "; ".join(s.replace(";", ",") for s in seeds),
-                "thread_1_answer": answers[0] if len(answers) > 0 else "",
-                "thread_2_answer": answers[1] if len(answers) > 1 else "",
-                "thread_3_answer": answers[2] if len(answers) > 2 else "",
-                "thread_4_answer": answers[3] if len(answers) > 3 else "",
+                **{f"thread_{i+1}_answer": answers[i] if i < len(answers) else "" for i in range(k)},
                 "oracle_correct": oracle, "synthesis_correct": syn_correct,
                 "jaccard_qpd": f"{jqpd:.6f}", "itc": f"{itc:.6f}", "atc": f"{atc:.6f}",
             }
@@ -438,7 +458,7 @@ async def run_diversity_parallel(
                      "answer": answers[i] if i < len(answers) else "",
                      "turn_logs": rollouts[i].get("turn_logs", []),
                      "full_responses": rollouts[i].get("full_responses", [])}
-                    for i in range(K)
+                    for i in range(k)
                 ],
                 "oracle_correct": oracle, "synthesis_answer": syn_ans, "synthesis_correct": syn_correct,
                 "jaccard_qpd": jqpd, "itc": itc, "atc": atc,
@@ -449,8 +469,7 @@ async def run_diversity_parallel(
             row = {
                 "question_id": qid, "question": ex.question, "gold_answer": gold,
                 "pool_queries": "", "selected_queries": "",
-                "thread_1_answer": "ERROR", "thread_2_answer": "ERROR",
-                "thread_3_answer": "ERROR", "thread_4_answer": "ERROR",
+                **{f"thread_{i+1}_answer": "ERROR" for i in range(k)},
                 "oracle_correct": 0, "synthesis_correct": 0,
                 "jaccard_qpd": "0.0", "itc": "0.0", "atc": "0.0",
             }
@@ -521,7 +540,23 @@ async def main_async(args) -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     max_turns_par = args.max_turns_par
-    max_turns_seq = K * max_turns_par  # compute-matched
+    # K (parallel threads) now comes from CLI; sequential total turns also from CLI
+    # (--max-turns-par) — caller is responsible for compute matching.
+    k_threads = args.k
+    max_turns_seq = max_turns_par  # sequential T is whatever the caller asked for
+    # Propagate max_tokens override to the diversity_scaling module if provided
+    if args.max_tokens and args.max_tokens > 0:
+        try:
+            from webwalkerqa.methods import diversity_scaling as _ds
+            _ds._DEFAULT_MAX_TOKENS = args.max_tokens
+        except Exception:
+            pass
+    # Propagate prompt style (default react_simple keeps current behavior)
+    try:
+        from webwalkerqa.methods.diversity_scaling import set_prompt_style
+        set_prompt_style(args.prompt_style)
+    except Exception:
+        pass
 
     # Set api_base for vLLM
     if args.api_base:
@@ -529,7 +564,15 @@ async def main_async(args) -> None:
 
     examples = load_dataset(path=args.dataset, max_examples=args.max_examples)
     print(f"Loaded {len(examples)} questions | model={model}")
-    print(f"Budget: seq=T{max_turns_seq} | par=k{K}×T{max_turns_par} | pool={POOL_SIZE}")
+    pool_size = args.pool_size
+    print(f"Budget: seq=T{max_turns_seq} | par=k{k_threads}×T{max_turns_par} | pool={pool_size} | max_tok={args.max_tokens or 2048}")
+
+    # Override per-rollout temperatures if --temperature was passed on the CLI.
+    if args.temperature is not None:
+        global _REACT_TEMP_FIRST, _REACT_TEMP_REST
+        _REACT_TEMP_FIRST = float(args.temperature)
+        _REACT_TEMP_REST  = float(args.temperature)
+        print(f"[temperature override] turn-1 = {_REACT_TEMP_FIRST}  rest = {_REACT_TEMP_REST}")
 
     sem = asyncio.Semaphore(args.max_concurrent)
     conditions = [args.condition] if args.condition else CONDITION_CHOICES
@@ -547,18 +590,22 @@ async def main_async(args) -> None:
             sr = _summary_row("sequential", rows)
 
         elif condition == "naive_parallel":
-            print(f"\n=== NAIVE PARALLEL (k={K}, T={max_turns_par}) ===")
-            rows = await run_naive_parallel(model, examples, max_turns_par, sem, traj_dir, run_seed=RUN_SEED)
+            print(f"\n=== NAIVE PARALLEL (k={k_threads}, T={max_turns_par}) ===")
+            rows = await run_naive_parallel(model, examples, max_turns_par, sem, traj_dir, run_seed=RUN_SEED, k=k_threads)
             csv_path = out_dir / f"naive_parallel_T{max_turns_par}.csv"
-            _write_csv(csv_path, rows, NAIVE_FIELDS)
+            _write_csv(csv_path, rows, _naive_fields(k_threads))
             _write_jsonl_for_judge(out_dir / f"naive_parallel_T{max_turns_par}.jsonl", rows, "naive_parallel")
             sr = _summary_row("naive_parallel", rows)
 
         elif condition == "diversity_parallel":
-            print(f"\n=== DIVERSITY PARALLEL (k={K}, T={max_turns_par}, pool={POOL_SIZE}, greedy-jaccard) ===")
-            rows = await run_diversity_parallel(model, examples, max_turns_par, sem, traj_dir, run_seed=RUN_SEED)
+            print(f"\n=== DIVERSITY PARALLEL (k={k_threads}, T={max_turns_par}, pool={pool_size}, oversample_until={args.oversample_until_turn}, greedy-jaccard) ===")
+            rows = await run_diversity_parallel(
+                model, examples, max_turns_par, sem, traj_dir, run_seed=RUN_SEED,
+                pool_size=pool_size, k=k_threads,
+                oversample_until_turn=args.oversample_until_turn,
+            )
             csv_path = out_dir / f"diversity_parallel_T{max_turns_par}.csv"
-            _write_csv(csv_path, rows, DIV_FIELDS)
+            _write_csv(csv_path, rows, _div_fields(k_threads))
             _write_jsonl_for_judge(out_dir / f"diversity_parallel_T{max_turns_par}.jsonl", rows, "diversity_parallel")
             sr = _summary_row("diversity_parallel", rows)
         else:
@@ -602,6 +649,20 @@ def main() -> None:
                    help="vLLM endpoint URL (e.g. http://localhost:8000/v1)")
     p.add_argument("--seed", type=int, default=0,
                    help="Global random seed (sets random, numpy, and per-rollout seeds)")
+    p.add_argument("--pool-size", type=int, default=8,
+                   help="Diversity pool size: number of candidate queries generated before greedy-Jaccard selection")
+    p.add_argument("--k", type=int, default=4,
+                   help="Number of parallel threads (parallel conditions only). Sequential ignores this.")
+    p.add_argument("--max-tokens", type=int, default=2048,
+                   help="Max output tokens per LLM call. Halve for k=8 compute-matched.")
+    p.add_argument("--oversample-until-turn", type=int, default=1,
+                   help="For diversity_parallel: replace the LLM's chosen search query with a pool-picked one that maximizes distance from this thread's prior queries, for turns 2..N. Default N=1 = current behavior (pool only at turn 1 via initial_query). N=8 = every turn uses pool override.")
+    p.add_argument("--prompt-style", default="react_simple",
+                   choices=["react_simple", "web_reasoning"],
+                   help="Prompt template. react_simple (default) = current MHQA runs. web_reasoning = Table 2 hard-reasoning/browsing tasks (enables <summary> action).")
+    p.add_argument("--temperature", type=float, default=None,
+                   help="If set, override BOTH react_temp_first and react_temp_rest to this value. "
+                        "Defaults: react_temp_first=1.0, react_temp_rest=0.7.")
     args = p.parse_args()
     asyncio.run(main_async(args))
 

@@ -1,0 +1,25 @@
+question_idx,question,std_wall_s,std_max_single_s,std_prompt_tok,std_completion_tok,div_wall_s,div_llm_s,div_cpu_s,div_prompt_tok,div_completion_tok,speedup
+0,I’m researching species that became invasive after people who kept them as pets ,3.062,3.031,832,70,7.637,7.636,0.000,169,308,0.40x
+1,"If we assume all articles published by Nature in 2020 (articles, only, not book ",0.507,0.506,732,76,10.305,10.305,0.000,144,418,0.05x
+2,"In Unlambda, what exact charcter or text needs to be added to correct the follow",0.426,0.425,780,61,6.328,6.328,0.000,156,256,0.07x
+3,"If Eliud Kipchoge could maintain his record-making marathon pace indefinitely, h",0.431,0.430,760,63,8.621,8.621,0.000,151,349,0.05x
+4,How many studio albums were published by Mercedes Sosa between 2000 and 2009 (in,0.604,0.604,596,90,8.475,8.475,0.000,110,343,0.07x
+5,"The object in the British Museum's collection with a museum number of 2012,5015.",0.882,0.881,740,133,8.118,8.118,0.000,146,328,0.11x
+6,"According to github, when was Regression added to the oldest closed numpy.polyno",0.456,0.456,544,68,7.739,7.739,0.000,97,313,0.06x
+7,"Here's a fun riddle that I think you'll enjoy.
+
+You have been selected to play t",0.429,0.429,2268,57,8.388,8.388,0.000,528,338,0.05x
+8,"In July 2, 1959 United States standards for grades of processed fruits, vegetabl",1.079,1.079,932,139,14.299,14.299,0.000,194,578,0.08x
+9,What are the EC numbers of the two most commonly used chemicals for the virus te,1.106,1.106,656,171,10.264,10.264,0.000,125,415,0.11x
+10,"In April of 1977, who was the Prime Minister of the first place mentioned by nam",0.482,0.482,568,70,6.633,6.633,0.000,103,268,0.07x
+11,Use density measures from the chemistry materials licensed by Marisa Alviar-Agne,0.510,0.510,888,76,6.862,6.862,0.000,183,277,0.07x
+12,What was the volume in m^3 of the fish bag that was calculated in the University,0.754,0.754,580,113,6.312,6.311,0.000,106,255,0.12x
+13,"Of the authors (First M. Last) that worked on the paper ""Pie Menus or Linear Men",0.876,0.875,644,110,14.578,14.578,0.000,122,589,0.06x
+14,"In Series 9, Episode 11 of Doctor Who, the Doctor is trapped inside an ever-shif",0.531,0.531,636,73,6.910,6.909,0.000,120,279,0.08x
+15,"In terms of geographical distance between capital cities, which 2 countries are ",0.428,0.427,608,58,7.750,7.750,0.000,113,313,0.06x
+16,"In the NCATS PubChem compound database for Food Additive Status classification, ",1.258,1.257,796,188,8.103,8.102,0.000,160,327,0.16x
+17,"I need to fact-check a citation. This is the citation from the bibliography:
+
+Gr",2.411,2.411,1232,376,8.626,8.626,0.000,269,348,0.28x
+18,Which contributor to the version of OpenCV where support was added for the Mask-,0.556,0.556,600,81,5.306,5.306,0.000,111,214,0.10x
+19,What integer-rounded percentage of the total length of the harlequin shrimp reco,0.632,0.631,656,96,10.571,10.571,0.000,125,427,0.06x

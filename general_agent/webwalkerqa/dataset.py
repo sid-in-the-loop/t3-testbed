@@ -55,7 +55,10 @@ def load_dataset(
         List of QAExample objects.
     """
     if path is not None:
-        examples = _load_from_json(path)
+        if path.endswith(".jsonl"):
+            examples = _load_from_jsonl(path)
+        else:
+            examples = _load_from_json(path)
     else:
         # Check for split-specific cache
         cache_path = DEFAULT_LOCAL_PATH.parent / f"webwalkerqa_{split}.json"
@@ -76,7 +79,7 @@ def load_dataset(
 
 
 def _load_from_json(path: str) -> list[QAExample]:
-    """Load from a local JSON file."""
+    """Load from a local JSON file (single JSON array)."""
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
@@ -88,6 +91,22 @@ def _load_from_json(path: str) -> list[QAExample]:
         # Normalise: if answer is a list, keep as-is; eval will handle it
         examples.append(QAExample(id=qid, question=question, answer=answer))
 
+    return examples
+
+
+def _load_from_jsonl(path: str) -> list[QAExample]:
+    """Load from a local JSONL file (one JSON object per line). Same schema as JSON: id, question, answer."""
+    examples = []
+    with open(path, "r", encoding="utf-8") as f:
+        for i, line in enumerate(f):
+            line = line.strip()
+            if not line:
+                continue
+            item = json.loads(line)
+            qid = str(item.get("id", item.get("question_id", str(i))))
+            question = item.get("question", item.get("query", ""))
+            answer = item.get("answer", item.get("answers", item.get("gold_answer", "")))
+            examples.append(QAExample(id=qid, question=question, answer=answer))
     return examples
 
 

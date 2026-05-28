@@ -74,6 +74,21 @@ python -m webwalkerqa.scaling_v2_experiment --aggregate-only
 
 ---
 
+## LLM Judge Evaluation
+
+To compute more accurate correctness (beyond string Exact Match), run the LLM judge:
+
+```bash
+cd general_agent
+python -m webwalkerqa.judge.eval_llm --input-dir results/gaia_103 --output-dir results/gaia_103_judged
+```
+
+- **Judge model:** `openai/gpt-4o-mini` (default).
+- **Outputs:** Judged JSONLs in `results/gaia_103_judged/` and `summary_llm.csv`.
+- **Metrics:** `pass@1_llm` and `pass@4_llm` based on LLM's CORRECT/INCORRECT decisions.
+
+---
+
 ## Metrics
 
 - **pass@1:** First rollout correct (exact match vs ground truth).

@@ -46,6 +46,9 @@ def compute_jaccard_distance_matrix(queries: List[str]) -> np.ndarray:
     return matrix
 
 
+# Default model for dense diversity (used by select_diverse_queries with method="dense")
+DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
 # Lazy singleton for MiniLM (loaded once per process)
 _minilm_model = None
 
@@ -54,6 +57,9 @@ def _get_minilm():
     """Return the MiniLM embedding model; load on first use."""
     global _minilm_model
     if _minilm_model is None:
+        import logging
+        # Suppress the "UNEXPECTED" warning from sentence-transformers/transformers
+        logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
         from sentence_transformers import SentenceTransformer
         _minilm_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     return _minilm_model

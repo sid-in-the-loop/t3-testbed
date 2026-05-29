@@ -19,7 +19,7 @@ mkdir -p logs/main_table logs/judge
 DATA_DIR="/home/ssmurali/t3-testbed/general_agent/data/main_table"
 ALL_CONDITIONS=("sequential" "naive_parallel" "diversity_parallel")
 SEEDS=(1 2 3 4 5)
-ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "GAIA" "hle" "webwalker")
+ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "gaia" "hle" "webwalker")
 
 CONDA_INIT="source /data/user_data/ssmurali/miniconda3/etc/profile.d/conda.sh && conda activate t3 && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH && set -a && source /home/ssmurali/t3-testbed/general_agent/.env && set +a"
 RUN_CMD="cd /home/ssmurali/t3-testbed/general_agent"

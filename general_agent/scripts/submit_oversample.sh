@@ -14,7 +14,7 @@ HF_MAP["qwen3-1.7b"]="Qwen/Qwen3-1.7B"
 HF_MAP["qwen3-8b"]="Qwen/Qwen3-8B"
 
 MODELS=("qwen3-1.7b" "qwen3-8b")
-DATASETS=("hotpotqa" "GAIA")
+DATASETS=("hotpotqa" "gaia")
 N_VALUES=(1 2 3 4 5 6 7 8)
 SEEDS=(1 2 3)
 DATA_DIR="/home/ssmurali/t3-testbed/general_agent/data/main_table"

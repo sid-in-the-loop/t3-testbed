@@ -36,7 +36,7 @@ HF_MAP["gpt-oss-20b"]="openai/gpt-oss-20b"
 HF_MAP["gemma3-4b"]="google/gemma-3-4b-it"
 HF_MAP["gemma3-12b"]="google/gemma-3-12b-it"
 
-ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "GAIA" "hle")
+ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "gaia" "hle")
 PHASE1_CONDS=("seq" "naive_k4" "div_k4" "naive_k8" "div_k8")
 DATA_DIR="/home/ssmurali/t3-testbed/general_agent/data/main_table"
 RESULTS_BASE="/home/ssmurali/t3-testbed/results/main_table_clueweb_t8"

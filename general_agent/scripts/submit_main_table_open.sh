@@ -26,7 +26,7 @@ DATA_DIR="/home/ssmurali/t3-testbed/general_agent/data/main_table"
 ENDPOINT_DIR="/home/ssmurali/t3-testbed/general_agent/results/vllm_servers"
 ALL_CONDITIONS=("sequential" "naive_parallel" "diversity_parallel")
 SEEDS=(1 2 3 4 5)
-ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "GAIA" "hle" "webwalker")
+ALL_DATASETS=("hotpotqa" "musique" "2wikimultihopqa" "bamboogle" "frames" "gaia" "hle" "webwalker")
 
 # model-short → HF model name (must match what was passed to launch_vllm_server.sh)
 declare -A MODEL_HF_MAP

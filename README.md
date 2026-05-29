@@ -1,107 +1,118 @@
-<h1 align="center">
-Benchmark Test-Time Scaling of General LLM Agents
-</h1>
+<h1 align="center">Beyond Parallel Sampling:<br>Diverse Query Initialization for Parallel Agentic Search</h1>
 
 <div align="center">
-<a href="https://xiaochuanli.com/">Xiaochuan Li</a>¹, <a href="https://github.com/Nozom1466">Ryan Ming</a>¹, <a href="https://www.linkedin.com/in/pranavsetlur/">Pranav Setlur</a>¹, <a href="https://www.linkedin.com/in/abhijay-paladugu/">Abhijay Paladugu</a>¹, <a href="https://www.linkedin.com/in/andy-tang-aa37b7237/">Andy Tang</a>¹, <a href="https://www.linkedin.com/in/haok1402/">Hao Kang</a>¹, 
-  
-<a href="https://scholar.google.com/citations?user=Rw4NiLAAAAAJ&hl=en">Shuai Shao</a>², <a href="https://scholar.google.com/citations?hl=zh-CN&user=CS5uNscAAAAJ&view_op=list_works&sortby=pubdate">Rong Jin</a>², <a href="https://www.cs.cmu.edu/~cx/">Chenyan Xiong</a>¹
+<a href="https://github.com/sid-in-the-loop">Sid Murali</a>*,
+Ethan Chi*,
+<a href="#">João Coelho</a>
 
-¹ Language Technology Institute, Carnegie Mellon University  
-² Meta
-
+Language Technologies Institute, Carnegie Mellon University
 </div>
 
 <div align="center">
 
-[![arXiv](https://img.shields.io/badge/arXiv-2602.18998-b31b1b.svg?style=flat)](http://arxiv.org/abs/2602.18998)
+[![Paper](https://img.shields.io/badge/EMNLP-2026-blue.svg?style=flat)](#citation)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](./LICENSE)
-[![Website](https://img.shields.io/badge/Website-GeneralAgentBench-blue.svg?style=flat)](https://general-agentbench.github.io/)
 
 </div>
 
-## ❓ Is Test-Time Scaling as Effective as You Think?
+---
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="assets/sequential_scaling.png" width="380" alt="Sequential test-time scaling" /><br><b>(a)</b> Sequential test-time scaling</td>
-    <td align="center"><img src="assets/parallel_scaling.png" width="380" alt="Parallel test-time scaling" /><br><b>(b)</b> Parallel test-time scaling</td>
-  </tr>
-</table>
+## The Problem: Anchor Collapse
 
-- **Sequential scaling** hits a **context ceiling**: performance initially improves with more interaction turns, but then plateaus and even declines as the growing context destabilizes the agent.
-- **Parallel scaling** suffers from a **verifiability gap**: while pass@K grows steadily with more samples, self-choice accuracy remains nearly flat — agents cannot reliably identify the correct trajectory among candidates.
-
-
-## 🔍 Overview
-
-- We introduce **General AgentBench**, a benchmark that provides a unified framework for evaluating general LLM agents across search, coding, reasoning, and tool-use domains. Evaluation of ten leading LLM agents reveals a substantial performance degradation when moving from domain-specific evaluations to this general-agent setting.
+Parallel agentic search runs multiple search threads independently, hoping diversity in trajectories leads to better coverage. In practice, threads issue near-identical turn-1 queries — we call this **anchor collapse**. Because threads start from the same anchor, they retrieve overlapping documents and fail in correlated ways, wasting the benefit of parallelism.
 
 <div align="center">
-  <img src="assets/overview_comparison.png" width="500" /><br>
-  <p>Performance comparison between specialized-agent and general-agent settings.<br>
-  <b>Top:</b> Absolute performance. <b>Bottom:</b> Relative performance degradation under the general-agent setting.</p>
+  <img src="paper_assets/figures/fig1/turn1_imprint.png" width="320" />
+  <p><i>Turn-1 query diversity (QPD) strongly predicts full-trajectory diversity. Standard parallel sampling clusters queries (low QPD); DivInit forces spread.</i></p>
 </div>
 
-- Using General AgentBench, we systematically study test-time scaling behaviors under **sequential scaling** (iterative interaction) and **parallel scaling** (sampling multiple trajectories).  We find that neither scaling methodology yields effective performance improvements in practice, due to two fundamental limitations: **context ceiling** in sequential scaling and **verification gap** in parallel scaling.
+## Method: DivInit
 
+**DivInit** breaks anchor collapse with a single training-free step: before launching threads, sample a pool of *k×m* candidate queries at temperature > 0, then greedily select *k* queries that maximise pairwise Jaccard distance. Each thread starts from a different seed.
 
+- No fine-tuning, no reward model, no extra inference budget beyond pool generation
+- Selection runs in milliseconds (token-level Jaccard, no embeddings needed)
+- Plug-in compatible with any ReAct-style agent
 
-## 🏗️ Repository Structure
+## Results
 
-| Directory                  | Description                                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `general_agent/`           | General agent system — unified MCP-based framework that connects a single agent to all benchmark tools simultaneously |
-| `benchmarks/`              | Individual benchmark implementations (tau2-bench, mcp-bench, swebench, terminalbench, mathhay, deepresearch, etc.)    |
-| `benchmarks/instructions/` | Setup and running guides for each individual benchmark                                                                |
+DivInit consistently improves pass@k across models and benchmarks.
 
+<div align="center">
+  <img src="paper_assets/figures/fig3/passk_sweep.png" width="380" />
+  <p><i>pass@k vs. number of parallel threads k. DivInit (Ours) outperforms standard parallel sampling across all k values.</i></p>
+</div>
 
-## ✅ Getting Started
+Full results across 7 benchmarks (HotpotQA, MuSiQue, 2WikiMultihopQA, Bamboogle, FRAMES, GAIA, WebWalkerQA) and 6 models (Qwen3-1.7B/4B/8B, Gemma3-4B/12B, GPT-4o-mini) are in `results/`.
 
-- **Run the general agent system:** see [general_agent/scripts/](general_agent/scripts/) for experiment scripts and [general_agent/README.md](general_agent/README.md) for details.
-- **Run individual benchmarks independently:** see [benchmarks/instructions/](benchmarks/instructions/) for per-benchmark setup and usage guides.
+## Repository Structure
 
-## 🎁 API Sources
+| Path | Description |
+|------|-------------|
+| `general_agent/webwalkerqa/` | Core agent, DivInit method, evaluation loop |
+| `general_agent/data/main_table/` | Benchmark datasets (7 benchmarks) |
+| `general_agent/scripts/` | SLURM launchers for all experiments |
+| `results/main_table/` | Main table results (clueweb and serper backends) |
+| `results/ablations/` | Oversample, pool-size, and temperature ablations |
+| `paper_assets/figures/` | All paper figures with generation scripts |
 
-General AgentBench may call external APIs for (1) LLM inference and (2) benchmark tools.
+## Getting Started
 
-### LLM inference (via LiteLLM)
-
-We use LiteLLM-style model strings (a.k.a. “model routes”) to specify which API/provider a run uses. If a single model has multiple routes listed, it means we have used all of those routes in different runs/stages.
-
-
-| Model             | Source                                                                |
-| ----------------- | --------------------------------------------------------------------- |
-| Qwen3-235B        | AWS Bedrock                                                           |
-| Qwen3-Next        | Hugging Face via Together (gateway)                                   |
-| OpenAI-oss-120B   | Hugging Face via Novita (gateway)                                     |
-| Gemini-2.5-Flash  | Google Gemini API                                                     |
-| Gemini-2.5-Pro    | Google Gemini API                                                     |
-| Claude-Haiku-4.5  | AWS Bedrock (Anthropic)                                               |
-| Claude-Sonnet-4.5 | AWS Bedrock (Anthropic)                                               |
-| DeepSeek-R1       | Hugging Face via Novita + Together (gateways)                         |
-| DeepSeek-V3.2     | Hugging Face via Novita + Fireworks (gateways) + AWS Bedrock Converse |
-| GPT-5             | OpenAI API                                                            |
-
-
-For the exact LiteLLM model routes used in experiments, see [general_agent/scripts/models.py](general_agent/scripts/models.py).
-
-### Tooling APIs
-
-
-| Benchmark | External API                       |
-| --------- | ---------------------------------- |
-| `search`  | Serper (Google Search API wrapper) |
-
-## 📚 Citation
-
-If you find this work or code useful, please consider citing:
-
-```bibtex
-coming soon
+**Install:**
+```bash
+cd general_agent
+pip install -e .
+pip install litellm sentence-transformers httpx python-dotenv
 ```
 
-## 📝 License
+**API keys** — create `general_agent/.env`:
+```
+OPENAI_API_KEY=...
+SERPER_API_KEY=...
+```
 
-This project is released under the MIT License.
-See [LICENSE](LICENSE) for details.
+**Quick run:**
+```bash
+cd general_agent
+python -m webwalkerqa.run.run_main_table \
+  --model openai/gpt-4o-mini \
+  --dataset data/main_table/hotpotqa.json \
+  --condition diversity_parallel \
+  --output-dir ../results/my_run
+```
+
+## Reproducing Results
+
+**Closed models** (OpenAI / Gemini):
+```bash
+cd general_agent
+bash scripts/submit_main_table.sh gpt-4o-mini
+```
+
+**Open models** (Qwen3, Gemma3 via vLLM) — see [`general_agent/HOW-TO-VLLM.md`](general_agent/HOW-TO-VLLM.md):
+```bash
+bash scripts/launch_vllm_server.sh Qwen/Qwen3-8B 8003
+bash scripts/submit_main_table_open.sh qwen3-8b
+```
+
+**Ablations:**
+```bash
+bash scripts/submit_oversample_ablation.sh   # oversample-until-turn ablation
+bash scripts/submit_poolsize.sh              # pool size sweep
+bash scripts/submit_temperature_sweep.sh     # temperature sweep
+```
+
+## Citation
+
+```bibtex
+@inproceedings{murali2026divinit,
+  title     = {Beyond Parallel Sampling: Diverse Query Initialization for Parallel Agentic Search},
+  author    = {Murali, Sid and Chi, Ethan and Coelho, Jo{\~a}o},
+  booktitle = {Proceedings of EMNLP},
+  year      = {2026}
+}
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

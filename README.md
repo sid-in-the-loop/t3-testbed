@@ -22,6 +22,11 @@ Language Technologies Institute, Carnegie Mellon University
 Parallel agentic search runs *k* threads independently and aggregates their answers. The intuition is that more threads cover more of the search space. In practice, threads tend to issue near-identical turn-1 queries — we call this **anchor collapse**.
 
 <div align="center">
+  <img src="paper_assets/figures/main-fig.png" width="600" />
+  <p><i>Sequential search explores one path; standard parallel sampling launches k threads that collapse onto the same retrieval region; DivInit spreads threads across the search space, letting one reach the answer.</i></p>
+</div>
+
+<div align="center">
   <img src="paper_assets/figures/fig2/qpd_density.png" width="340" />
   <p><i>Turn-1 query diversity (QPD) under standard parallel sampling vs. DivInit (Qwen3-8B, k=4). Standard sampling clusters near QPD≈0.2; DivInit forces spread toward QPD≈0.85.</i></p>
 </div>

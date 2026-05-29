@@ -1,8 +1,0 @@
-startCommand:
-  type: stdio
-  configSchema:
-    type: object
-    properties: {}
-  commandFunction: |
-    (config) => ({ command: 'uv', args: ['run', 'src/server.py'] })
-  exampleConfig: {}

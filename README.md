@@ -1,15 +1,19 @@
 <h1 align="center">Beyond Parallel Sampling:<br>Diverse Query Initialization for Parallel Agentic Search</h1>
 
 <div align="center">
-<a href="https://github.com/sid-in-the-loop">Sid Murali</a>*,
-Ethan Chi*,
-<a href="#">João Coelho</a>
-&nbsp;·&nbsp; Carnegie Mellon University
+<a href="https://github.com/sid-in-the-loop">Sidhaarth Murali</a>,
+<a href="#">João Coelho</a>,
+Jingjie Ning,
+João Magalhães,
+Bruno Martins,
+<a href="#">Chenyan Xiong</a>
+
+Carnegie Mellon University &nbsp;·&nbsp; IST Lisboa / INESC-ID &nbsp;·&nbsp; Universidade Nova de Lisboa
 </div>
 
 <div align="center">
 
-[![Paper](https://img.shields.io/badge/EMNLP-2026-blue.svg?style=flat)](#citation)
+[![Paper](https://img.shields.io/badge/Preprint-2026-red.svg?style=flat)](#citation)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat)](./LICENSE)
 
 </div>
@@ -137,9 +141,9 @@ bash scripts/submit_temperature_sweep.sh
 ```bibtex
 @inproceedings{murali2026divinit,
   title     = {Beyond Parallel Sampling: Diverse Query Initialization for Parallel Agentic Search},
-  author    = {Murali, Sid and Chi, Ethan and Coelho, Jo{\~a}o},
-  booktitle = {Proceedings of EMNLP},
-  year      = {2026}
+  author    = {Murali, Sidhaarth and Coelho, Jo{\~a}o and Ning, Jingjie and Magalh{\~a}es, Jo{\~a}o and Martins, Bruno and Xiong, Chenyan},
+  year      = {2026},
+  note      = {Preprint}
 }
 ```
 

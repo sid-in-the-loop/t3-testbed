@@ -21,7 +21,7 @@ Carnegie Mellon University &nbsp;·&nbsp; IST Lisboa / INESC-ID &nbsp;·&nbsp; U
 ---
 
 <div align="center">
-  <img src="paper_assets/figures/main-fig.png" width="620" />
+  <img src="paper_assets/figures/main-fig.png" width="520" />
 </div>
 
 More parallel threads should mean better coverage of the search space. In practice, they don't — they collapse onto the same first query, retrieve the same evidence, and fail together. We call this **anchor collapse**, and we fix it with a single training-free intervention: **DivInit**.

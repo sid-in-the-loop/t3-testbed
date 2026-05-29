@@ -32,7 +32,7 @@ HF_MAP["gpt-oss-20b"]="openai/gpt-oss-20b"
 declare -A DS_MAP
 DS_MAP["webwalker"]="webwalker_sub.json"
 DS_MAP["hle"]="hle_sub.json"
-DS_MAP["gaia"]="gaia_full.json"
+DS_MAP["gaia"]="gaia.json"
 DS_MAP["browsecomp"]="browsecomp_sub.json"
 
 ALL_DATASETS=("webwalker" "hle" "gaia" "browsecomp")

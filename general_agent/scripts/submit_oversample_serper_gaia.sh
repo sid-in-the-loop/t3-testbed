@@ -15,7 +15,7 @@ LITELLM_MODEL="openai/${HF_MODEL}"
 
 N_VALUES=(1 2 3 4 5 6 7 8)
 SEEDS=(1 2 3)
-DATASET_PATH="/home/ssmurali/t3-testbed/general_agent/data/main_table/gaia_full.json"
+DATASET_PATH="/home/ssmurali/t3-testbed/general_agent/data/main_table/gaia.json"
 RESULTS_BASE="/home/ssmurali/t3-testbed/results/oversample_ablation_serper"
 
 CONDA_INIT="source /data/user_data/ssmurali/miniconda3/etc/profile.d/conda.sh && conda activate t3 && export LD_LIBRARY_PATH=\$CONDA_PREFIX/lib:\$LD_LIBRARY_PATH && export HF_HOME=/data/user_data/ssmurali/hf_cache && export HF_HUB_CACHE=/data/user_data/ssmurali/hf_cache/hub && export VLLM_CACHE_ROOT=/data/user_data/ssmurali/vllm_cache && mkdir -p \$VLLM_CACHE_ROOT && export OPENAI_API_KEY=dummy && set -a && source /home/ssmurali/t3-testbed/general_agent/.env && set +a && export SEARCH_BACKEND=serper"

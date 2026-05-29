@@ -165,7 +165,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, help="e.g. openai/Qwen/Qwen3-8B")
     parser.add_argument("--api-base", required=True, help="e.g. http://localhost:8003/v1")
-    parser.add_argument("--dataset", default=str(DATA_DIR / "GAIA.json"),
+    parser.add_argument("--dataset", default=str(DATA_DIR / "gaia.json"),
                         help="Dataset JSON (default: GAIA)")
     parser.add_argument("--n-questions", type=int, default=20)
     parser.add_argument("--k", type=int, default=4)

@@ -28,7 +28,7 @@ DS_PROMPT["hotpotqa"]="react_simple"
 DS_MAXTOK["hotpotqa"]=2048
 DS_JUDGE["hotpotqa"]="mhqa"
 
-DS_FILE["gaia"]="gaia_full.json"
+DS_FILE["gaia"]="gaia.json"
 DS_BACKEND["gaia"]="serper"
 DS_PROMPT["gaia"]="web_reasoning"
 DS_MAXTOK["gaia"]=8192

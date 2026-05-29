@@ -56,7 +56,7 @@ from webwalkerqa.llm import call_llm as _call_llm_base
 
 # ── constants ──────────────────────────────────────────────────────────────────
 DEFAULT_MODEL   = "openai/gpt-4o-mini"
-DEFAULT_DATASET = str(_GA_DIR / "data" / "GAIA.json")
+DEFAULT_DATASET = str(_GA_DIR / "data" / "gaia.json")
 DEFAULT_OUT     = _TESTBED_ROOT / "results" / "figure2"
 FIGURE1_DIR     = _TESTBED_ROOT / "results" / "figure1"
 

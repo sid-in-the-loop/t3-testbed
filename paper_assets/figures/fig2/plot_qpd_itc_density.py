@@ -6,8 +6,8 @@ Two panels (saved separately so the paper can lay them out side-by-side):
   itc_density  — intra-thread coherence distribution (right panel)
 
 Source data:
-  results/figure2/qpd_distributions.csv
-  results/figure2/itc_distributions.csv
+  results/support_data/qpd_distributions.csv
+  results/support_data/itc_distributions.csv
 
 Outputs (paper_assets/figures/fig2/):
   qpd_density.{pdf,png}
@@ -30,7 +30,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from paper_style import NAIVE, S3, AXIS, apply_paper_style, save_fig, TESTBED_ROOT  # noqa: E402
 
-DATA_DIR = TESTBED_ROOT / "results" / "figure2"
+DATA_DIR = TESTBED_ROOT / "results" / "support_data"
 
 PALETTE = {
     "naive_parallel": {"color": NAIVE, "label": "Standard"},
@@ -124,7 +124,7 @@ def plot_qpd() -> None:
 
     fig.tight_layout(pad=0.5)
     save_fig(fig, "qpd_density", subdir="fig2",
-             also_dirs=[DATA_DIR])  # also write into results/figure2/ for backwards-compat
+             also_dirs=[DATA_DIR])  # also write into results/support_data/ for backwards-compat
     plt.close(fig)
     print("  Wrote qpd_density.{pdf,png}")
 

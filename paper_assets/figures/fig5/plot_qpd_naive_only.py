@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "_shared"))
 from paper_style import NAIVE, AXIS, GRID, apply_paper_style, save_fig, TESTBED_ROOT  # noqa: E402
 
-DATA = TESTBED_ROOT / "results" / "figure2" / "qpd_distributions.csv"
+DATA = TESTBED_ROOT / "results" / "support_data" / "qpd_distributions.csv"
 
 
 def kde(values, x, bw=0.35):

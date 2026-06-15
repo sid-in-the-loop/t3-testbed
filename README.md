@@ -88,7 +88,6 @@ Across five open-weight models and eight benchmarks, DivInit improves pass@4 by 
 |------|-------------|
 | `general_agent/webwalkerqa/` | Core agent, DivInit method, evaluation |
 | `general_agent/data/main_table/` | 8 benchmark datasets |
-| `general_agent/scripts/` | SLURM launchers |
 | `results/main_table/` | Main table results |
 | `results/ablations/` | Pool size, oversample, temperature ablations |
 | `paper_assets/figures/` | All figures with generation scripts |
@@ -118,22 +117,32 @@ python -m webwalkerqa.run.run_main_table \
 
 ## Reproducing Results
 
-**Open models** (Qwen3, Gemma3 via vLLM) — see [`HOW-TO-VLLM.md`](general_agent/HOW-TO-VLLM.md):
+**Open models** (Qwen3, Gemma3) — serve via vLLM first, then run:
 ```bash
-bash scripts/launch_vllm_server.sh Qwen/Qwen3-8B 8003
-bash scripts/submit_main_table_open.sh qwen3-8b
+vllm serve Qwen/Qwen3-8B --port 8003 --enable-prefix-caching --dtype auto
+
+cd general_agent
+python -m webwalkerqa.run.run_main_table \
+  --model openai/Qwen/Qwen3-8B \
+  --api-base http://localhost:8003/v1 \
+  --dataset data/main_table/hotpotqa.json \
+  --condition diversity_parallel \
+  --output-dir ../results/my_run
 ```
 
-**Closed models:**
+**Closed models** (GPT-4o-mini, Gemini):
 ```bash
-bash scripts/submit_main_table.sh gpt-4o-mini
+cd general_agent
+python -m webwalkerqa.run.run_main_table \
+  --model openai/gpt-4o-mini \
+  --dataset data/main_table/hotpotqa.json \
+  --condition diversity_parallel \
+  --output-dir ../results/my_run
 ```
 
-**Ablations:**
+**Aggregate results:**
 ```bash
-bash scripts/submit_oversample_ablation.sh
-bash scripts/submit_poolsize.sh
-bash scripts/submit_temperature_sweep.sh
+python -m webwalkerqa.scripts.aggregate_results --results-dir ../results
 ```
 
 ## Citation

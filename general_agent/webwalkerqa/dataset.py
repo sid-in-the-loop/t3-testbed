@@ -1,37 +1,19 @@
-"""
-WebWalkerQA dataset loading.
-
-Supports:
-  1. Local JSON file: list of {"id", "question", "answer"} dicts
-  2. HuggingFace Hub: datasets.load_dataset("callanwu/WebWalkerQA")
-  3. Auto-download to a local cache
-
-Format expected:
-  [
-    {"id": "0", "question": "...", "answer": "..."},
-    ...
-  ]
-"""
-
 import json
 import os
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
 
-# Default local path for the dataset
 DEFAULT_LOCAL_PATH = Path(__file__).parent.parent / "data" / "webwalkerqa_200.json"
 
-# HuggingFace dataset identifier
 HF_DATASET_ID = "callanwu/WebWalkerQA"
 
 
 @dataclass
 class QAExample:
-    """Single WebWalkerQA example."""
     id: str
     question: str
-    answer: str  # Ground-truth answer (may be a list or string)
+    answer: str
 
 
 def load_dataset(
@@ -60,7 +42,6 @@ def load_dataset(
         else:
             examples = _load_from_json(path)
     else:
-        # Check for split-specific cache
         cache_path = DEFAULT_LOCAL_PATH.parent / f"webwalkerqa_{split}.json"
         if cache_path.exists():
             examples = _load_from_json(str(cache_path))
@@ -88,7 +69,6 @@ def _load_from_json(path: str) -> list[QAExample]:
         qid = str(item.get("id", item.get("question_id", str(i))))
         question = item.get("question", item.get("query", ""))
         answer = item.get("answer", item.get("answers", item.get("gold_answer", "")))
-        # Normalise: if answer is a list, keep as-is; eval will handle it
         examples.append(QAExample(id=qid, question=question, answer=answer))
 
     return examples
@@ -130,7 +110,6 @@ def _load_from_hf(split: str) -> list[QAExample]:
         answer = item.get("answer", item.get("answers", item.get("gold_answer", "")))
         examples.append(QAExample(id=qid, question=question, answer=answer))
 
-    # Cache locally for next run
     cache_path = DEFAULT_LOCAL_PATH.parent / f"webwalkerqa_{split}.json"
     _save_to_cache(examples, cache_path)
     return examples

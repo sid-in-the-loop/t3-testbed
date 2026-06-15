@@ -1,29 +1,17 @@
-"""
-Experiment configs for GAIA-103 diversity experiment.
-
-9 conditions:
-- naive-t4: 4 independent rollouts, no diversity (sequential, k=4).
-- jaccard-o{16,32,48,64}: pool o, Jaccard max-min select 4, run 4 threads.
-- dense-o{16,32,48,64}: pool o, dense-embedding max-min select 4, run 4 threads.
-
-T=12 turns, n=4 rollouts per question. pass@1 and pass@4.
-"""
-
 from dataclasses import dataclass
 from typing import Literal
 
 
 @dataclass(frozen=True)
 class ExperimentConfig:
-    """Single experiment configuration."""
     id: str
     method: Literal["sequential", "diversity_parallel"]
-    k: int                            # threads/rollouts per question (4)
-    n: int                            # turns per rollout (12)
-    t: int                            # tokens per turn (unused in this experiment)
+    k: int
+    n: int
+    t: int
     group: str
-    o: int = 0                        # pool size for diversity_parallel (16, 32, 48, 64)
-    diversity_method: str = "jaccard"  # "jaccard" or "dense"
+    o: int = 0
+    diversity_method: str = "jaccard"
     description: str = ""
 
     @property
@@ -39,7 +27,6 @@ class ExperimentConfig:
         return max(128, self.t // 2)
 
 
-# 9 conditions: naive-t4, jaccard-o16/32/48/64, dense-o16/32/48/64
 EXPERIMENT_MATRIX: dict[str, ExperimentConfig] = {
     "naive-t4": ExperimentConfig(
         id="naive-t4",

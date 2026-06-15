@@ -1,10 +1,3 @@
-"""
-Base class for all WebWalkerQA methods (s1, T³ Fixed, T³ Dynamic, T³ DPP).
-
-Each method implements run_question() which processes one question and returns
-a MethodResult with the final answer and per-turn logs.
-"""
-
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -15,17 +8,13 @@ from typing import Optional
 class TurnLog:
     """Log for a single turn of reasoning."""
     turn: int
-    # For T³ methods: per-thread info
-    thread_queries: list[str] = field(default_factory=list)    # search query per thread
-    thread_results: list[str] = field(default_factory=list)    # raw search results per thread
-    thread_summaries: list[str] = field(default_factory=list)  # summaries produced by threads
-    # For s1: single-thread trace
+    thread_queries: list[str] = field(default_factory=list)
+    thread_results: list[str] = field(default_factory=list)
+    thread_summaries: list[str] = field(default_factory=list)
     reasoning: str = ""
     search_queries: list[str] = field(default_factory=list)
-    # Parent synthesis
     parent_response: str = ""
     answer_found: bool = False
-    # Token accounting
     prompt_tokens: int = 0
     output_tokens: int = 0
 
@@ -35,26 +24,18 @@ class MethodResult:
     """Result of running a method on one question."""
     question_id: str
     question: str
-    answer_gt: str                           # Ground truth
-    final_answer: str                        # Model's final answer
-    em: bool = False                         # Exact match against ground truth
-    f1: float = 0.0                          # F1 score against ground truth
-
-    # Per-turn logs
+    answer_gt: str
+    final_answer: str
+    em: bool = False
+    f1: float = 0.0
     turns: list[TurnLog] = field(default_factory=list)
-
-    # Aggregate stats
     turns_used: int = 0
     search_calls_used: int = 0
     total_prompt_tokens: int = 0
     total_output_tokens: int = 0
-
-    # Method metadata
     method: str = ""
     config_id: str = ""
     metadata: dict = field(default_factory=dict)
-
-    # Error (if run failed)
     error: Optional[str] = None
 
     def to_dict(self) -> dict:
@@ -110,7 +91,6 @@ def extract_answer(text: str) -> Optional[str]:
 
 
 class BaseMethod(ABC):
-    """Abstract base for all methods."""
 
     def __init__(self, model: str, config, verbose: bool = False):
         """

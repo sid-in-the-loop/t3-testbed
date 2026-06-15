@@ -1,17 +1,3 @@
-"""
-LLM-as-Judge for main table results.
-
-Walks results/main_table/{model}/{dataset}/{condition}/run_{i}/
-Finds *_T*.jsonl files, judges all rollout answers, and appends
-pass_at_1_llm / pass_at_4_llm columns to the existing summary_T*.csv in-place.
-
-Usage:
-  cd general_agent
-  python -m webwalkerqa.judge.eval_llm --results-dir results/main_table
-  python -m webwalkerqa.judge.eval_llm --results-dir results/main_table --filter-model gpt-4o-mini
-  python -m webwalkerqa.judge.eval_llm --results-dir results/main_table --filter-dataset bamboogle --filter-condition diversity_parallel
-"""
-
 import argparse
 import asyncio
 import json
@@ -52,7 +38,6 @@ Evaluation Rubric:
 Briefly explain your reasoning, then output "CORRECT" or "INCORRECT" on the final line."""
 
 
-# Web-task judge prompt (from WebWalker/arXiv reference). Shorter rubric, explicit JSON output.
 WEB_JUDGE_PROMPT = """Please determine if the predicted answer is SEMANTICALLY equivalent to the labeled answer.
 
 Question: {question}
@@ -63,7 +48,6 @@ Output as JSON (no markdown fences):
 {{"rationale": "your rationale as text", "judgement": "correct" or "incorrect"}}"""
 
 
-# Module-level override; CLI flag switches it.
 _JUDGE_PROMPT_STYLE = "mhqa"
 
 
@@ -104,16 +88,13 @@ async def judge_answer(
                 max_tokens=300,
                 temperature=0.0,
             )
-            # Web judge: JSON output with "judgement": "correct"/"incorrect"
             if _JUDGE_PROMPT_STYLE == "web":
                 import re
                 m = re.search(r'"judgement"\s*:\s*"(correct|incorrect)"', response, re.IGNORECASE)
                 if m:
                     return m.group(1).lower() == "correct"
-                # Fallback: scan text
                 resp_low = response.lower()
                 return "incorrect" not in resp_low and "correct" in resp_low
-            # MHQA judge: last-line CORRECT/INCORRECT
             lines = response.strip().split("\n")
             for line in reversed(lines):
                 line = line.strip().upper()
@@ -139,10 +120,9 @@ def find_run_dirs(
     matches = []
     for jsonl_path in sorted(results_dir.rglob("*_T*.jsonl")):
         run_dir = jsonl_path.parent
-        # Expected structure: results_dir/model/dataset/condition/run_N/file.jsonl
         try:
             rel = jsonl_path.relative_to(results_dir)
-            parts = rel.parts  # (model, dataset, condition, run_N, filename)
+            parts = rel.parts
             if len(parts) < 5:
                 continue
             model_dir, dataset, condition = parts[0], parts[1], parts[2]
@@ -156,7 +136,6 @@ def find_run_dirs(
         if filter_condition and condition != filter_condition:
             continue
 
-        # Find matching summary CSV (summary_T*.csv in same dir)
         summary_files = list(run_dir.glob("summary_T*.csv"))
         if not summary_files:
             continue
@@ -235,7 +214,6 @@ async def run_judge(results_dir: Path, model: str, max_concurrent: int,
         print("No matching run dirs found.")
         return
 
-    # Filter out already-judged runs unless --force
     to_judge = []
     skipped = 0
     for run_dir, jsonl_path, summary_csv in run_entries:
@@ -249,7 +227,6 @@ async def run_judge(results_dir: Path, model: str, max_concurrent: int,
     if not to_judge:
         return
 
-    # Load all JSONL data and create judgment tasks
     semaphore = asyncio.Semaphore(max_concurrent)
     all_tasks = []
     run_data: List[Tuple[Path, Path, Path, List[Tuple[Dict, List]]]] = []
@@ -276,7 +253,6 @@ async def run_judge(results_dir: Path, model: str, max_concurrent: int,
     print(f"Judging {total_answers} rollout answers across {len(to_judge)} runs...")
     await tqdm.gather(*all_tasks, desc="Judging")
 
-    # Update results
     for run_dir, jsonl_path, summary_csv, questions in run_data:
         judged = []
         for data, tasks in questions:
@@ -290,13 +266,10 @@ async def run_judge(results_dir: Path, model: str, max_concurrent: int,
         mean_p1 = sum(d["pass_at_1_llm"] for d in judged) / n if n else 0
         mean_p4 = sum(d["pass_at_4_llm"] for d in judged) / n if n else 0
 
-        # Append llm cols to existing summary CSV
         df = pd.read_csv(summary_csv)
         df["pass_at_1_llm"] = round(mean_p1, 4)
         df["pass_at_4_llm"] = round(mean_p4, 4)
         df.to_csv(summary_csv, index=False)
-
-        # Overwrite jsonl with judged entries
         with open(jsonl_path, "w") as f:
             for entry in judged:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -328,10 +301,8 @@ async def main():
                         help="Judge prompt template. mhqa (default) = current. web = WebWalker-paper JSON-output prompt for Table 2 hard-reasoning tasks.")
     args = parser.parse_args()
 
-    # Apply judge style module-level
     set_judge_prompt_style(args.judge_prompt_style)
 
-    # --run-dir mode: judge a flat run dir directly (no nested structure needed)
     if args.run_dir:
         run_dir = Path(args.run_dir).resolve()
         if not run_dir.exists():

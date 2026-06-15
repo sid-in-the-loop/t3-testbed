@@ -1,29 +1,3 @@
-"""
-Main table experiment runner — generalized from figure1_gaia103_experiment.py.
-
-Three conditions at matched compute budget:
-  Sequential:      k=1, T = max_turns_par * K
-  Naive parallel:  k=K, T = max_turns_par
-  Div. parallel:   k=K, T = max_turns_par, pool=16, greedy-Jaccard
-
-Usage:
-  cd general_agent
-  python -m webwalkerqa.run.run_main_table \
-    --model openai/gpt-4o-mini \
-    --dataset data/main_table/hotpotqa.json \
-    --condition diversity_parallel \
-    --max-turns-par 5 \
-    --output-dir /path/to/results/main_table/gpt-4o-mini/hotpotqa
-
-  # For vLLM models:
-  python -m webwalkerqa.run.run_main_table \
-    --model openai/Qwen3-8B \
-    --dataset data/main_table/hotpotqa.json \
-    --condition naive_parallel \
-    --api-base http://localhost:8003/v1 \
-    --output-dir /path/to/results/main_table/qwen3-8b/hotpotqa
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -60,19 +34,13 @@ from webwalkerqa.methods.diversity_scaling import (
 )
 from webwalkerqa.methods.utils import select_diverse_queries
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-K         = 4   # parallel threads
-POOL_SIZE = 8  # diversity pool size
+K         = 4
+POOL_SIZE = 8
 SYNTH_SNIPPET = 800
 
-# Mutable module-level rollout temperatures.  Overridden in main_async() when
-# the CLI passes --temperature; otherwise stay at the canonical defaults
-# (turn-1 = 1.0, later turns = 0.7).
 _REACT_TEMP_FIRST = 1.0
 _REACT_TEMP_REST  = 0.7
 
-
-# ── QPD / ITC helpers ────────────────────────────────────────────────────────
 
 def jaccard_distance(a: str, b: str) -> float:
     from webwalkerqa.methods.utils import jaccard_distance as _jd
@@ -127,8 +95,6 @@ def compute_atc(turn_logs_per_thread: List[List[Dict]], max_turns: int) -> float
     return float(np.mean(values)) if values else 0.0
 
 
-# ── Helpers ──────────────────────────────────────────────────────────────────
-
 def _get_turn1_query(rollout: Dict[str, Any]) -> str:
     for log in (rollout.get("turn_logs") or []):
         if log.get("query"):
@@ -177,11 +143,7 @@ async def synthesize(model: str, question: str, rollouts: List[Dict], answers: L
     return ans.strip() if ans else (text or "").strip()[:2000]
 
 
-# ── Output helpers ───────────────────────────────────────────────────────────
-
 def _save_trajectory(traj_dir: Path, qid: str, data: Dict[str, Any]) -> None:
-    # Non-fatal: disk-quota / permission errors should not abort the whole run.
-    # The per-question CSV row still gets written separately.
     try:
         traj_dir.mkdir(parents=True, exist_ok=True)
         path = traj_dir / f"{qid}.json"
@@ -230,8 +192,6 @@ def _tqdm(iterable, **kwargs):
     except ImportError:
         return iterable
 
-
-# ── Condition 1: Sequential ─────────────────────────────────────────────────
 
 SEQ_FIELDS = [
     "question_id", "question", "predicted_answer", "gold_answer",
@@ -288,8 +248,6 @@ async def run_sequential(
     pbar.close()
     return rows
 
-
-# ── Condition 2: Naive Parallel ─────────────────────────────────────────────
 
 NAIVE_FIELDS = [
     "question_id", "question", "gold_answer",
@@ -379,8 +337,6 @@ async def run_naive_parallel(
     pbar.close()
     return rows
 
-
-# ── Condition 3: Diversity Parallel (greedy-Jaccard) ────────────────────────
 
 DIV_FIELDS = [
     "question_id", "question", "gold_answer",
@@ -482,8 +438,6 @@ async def run_diversity_parallel(
     return rows
 
 
-# ── Summary ──────────────────────────────────────────────────────────────────
-
 SUMMARY_FIELDS = [
     "condition", "n_questions", "n_correct",
     "pass_at_1", "pass_at_4", "synthesis_accuracy",
@@ -503,13 +457,12 @@ def _summary_row(condition: str, rows: List[Dict]) -> Dict:
     if condition == "sequential":
         n_correct = sum(int(r.get("correct", 0)) for r in rows)
         pass_1 = n_correct / n
-        pass_4 = pass_1  # k=1
+        pass_4 = pass_1
         synth_acc = pass_1
     else:
         n_correct = sum(int(r.get("oracle_correct", 0)) for r in rows)
-        # pass@1 = first thread correct
         pass_1 = sum(1 for r in rows if exact_match(r.get("thread_1_answer", ""), r.get("gold_answer", ""))) / n
-        pass_4 = n_correct / n  # oracle = any of 4 correct
+        pass_4 = n_correct / n
         synth_acc = sum(int(r.get("synthesis_correct", 0)) for r in rows) / n
 
     return {
@@ -525,8 +478,6 @@ def _summary_row(condition: str, rows: List[Dict]) -> Dict:
     }
 
 
-# ── Main ─────────────────────────────────────────────────────────────────────
-
 CONDITION_CHOICES = ["sequential", "naive_parallel", "diversity_parallel"]
 
 
@@ -540,25 +491,20 @@ async def main_async(args) -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     max_turns_par = args.max_turns_par
-    # K (parallel threads) now comes from CLI; sequential total turns also from CLI
-    # (--max-turns-par) — caller is responsible for compute matching.
     k_threads = args.k
-    max_turns_seq = max_turns_par  # sequential T is whatever the caller asked for
-    # Propagate max_tokens override to the diversity_scaling module if provided
+    max_turns_seq = max_turns_par
     if args.max_tokens and args.max_tokens > 0:
         try:
             from webwalkerqa.methods import diversity_scaling as _ds
             _ds._DEFAULT_MAX_TOKENS = args.max_tokens
         except Exception:
             pass
-    # Propagate prompt style (default react_simple keeps current behavior)
     try:
         from webwalkerqa.methods.diversity_scaling import set_prompt_style
         set_prompt_style(args.prompt_style)
     except Exception:
         pass
 
-    # Set api_base for vLLM
     if args.api_base:
         set_api_base(args.api_base)
 
@@ -567,7 +513,6 @@ async def main_async(args) -> None:
     pool_size = args.pool_size
     print(f"Budget: seq=T{max_turns_seq} | par=k{k_threads}×T{max_turns_par} | pool={pool_size} | max_tok={args.max_tokens or 2048}")
 
-    # Override per-rollout temperatures if --temperature was passed on the CLI.
     if args.temperature is not None:
         global _REACT_TEMP_FIRST, _REACT_TEMP_REST
         _REACT_TEMP_FIRST = float(args.temperature)
@@ -618,7 +563,6 @@ async def main_async(args) -> None:
         spath = out_dir / f"summary_T{max_turns_par}.csv"
         _write_csv(spath, summary_rows, SUMMARY_FIELDS)
 
-    # Print table
     print("\n" + "=" * 90)
     print(f"{'Condition':<24} {'N':>5} {'P@1':>6} {'P@4':>6} {'Synth':>7} {'QPD':>7} {'ITC':>7} {'ATC':>7}")
     print("-" * 90)

@@ -1,21 +1,10 @@
-"""
-Diversity Scaling Methods — 200 rollouts per condition (25q × 8 rollouts/q).
-
-- Rollout = one full agent run (12 turns, 1 answer).
-- 8 rollouts per question → 200 total per condition.
-
-SEQUENTIAL — 200 rollouts, free turn-1.
-DIVERSITY-1 (Jaccard/TFIDF, o=16/48/64) — 200 rollouts; at turn-1 only: oversample o, DPP select 1, use as turn-1.
-DIVERSITY-ALL TFIDF o=64 — 200 rollouts; at every turn: oversample 64, DPP select 1.
-"""
-
 import asyncio
 import hashlib
 import re
 from typing import Optional, List, Tuple, Dict, Any
 
 
-SEED_MAX = 2**32  # API (e.g. OpenAI) requires seed in [0, SEED_MAX - 1]
+SEED_MAX = 2**32
 
 
 def _seed_from_question_id(question_id: str) -> int:
@@ -38,10 +27,8 @@ from ..eval import exact_match
 from .base import BaseMethod, MethodResult, TurnLog, extract_answer
 from .utils import select_diverse_queries
 
-# Module-level default max_tokens; run_main_table overrides this for k=8 (halved).
 _DEFAULT_MAX_TOKENS = 2048
 
-# Prompt style: "react_simple" (default — current MHQA runs) | "web_reasoning" (Table 2)
 _PROMPT_STYLE = "react_simple"
 
 
@@ -52,7 +39,6 @@ def set_prompt_style(style: str) -> None:
     _PROMPT_STYLE = style
 
 
-# ReAct prompt — explicit format so extraction rarely fails
 REACT_PROMPT = """\
 You are a research assistant that answers questions by searching the web.
 
@@ -105,7 +91,6 @@ def _extract_answer_candidate(text: str, is_last_turn: bool = False) -> Tuple[Op
         return (None, None)
 
     candidate = None
-    # Pattern: "answer is X", "answer: X", "thus X", "therefore X"
     for pattern in [
         r"(?:answer is|answer:)\s*[:\-]?\s*(.+?)(?:\.|$)",
         r"(?:thus|therefore|so),?\s*(?:the answer is\s+)?(.+?)(?:\.|$)",
@@ -153,7 +138,6 @@ def _parse_pool_response(text: str, o: int) -> List[str]:
     return queries[:o]
 
 
-# Search-R1 style prompt for multi-hop reasoning
 SEARCH_R1_PROMPT = """\
 Answer the given question. You must conduct reasoning inside <think> and </think> first every time you get new information.
 After reasoning, if you find you lack some knowledge, you can call a search engine by <search> query </search> and it will return the top searched results between <information> and </information>.
@@ -168,9 +152,6 @@ Question: {question}
 Your response (use <think>, then either <search> or <answer>):"""
 
 
-# Web-reasoning prompt — for WebWalker / HLE / GAIA / BrowseComp (Serper backend, harder reasoning tasks).
-# Adapted from WebWalker paper (arXiv), "models without internal thinking" variant — supports
-# <search>, <summary>, <answer> actions.
 WEB_REASONING_PROMPT = """\
 You are a research assistant with the ability to perform web searches to answer questions.
 You can answer a question with many turns of search and reasoning.
@@ -208,14 +189,12 @@ History Turns:
 
 def get_prompt_for_question(question_id: str, question: str, turn: int, max_turns: int, history: str) -> str:
     """Select and format the prompt. Style is module-level (_PROMPT_STYLE); dataset source is fallback routing."""
-    # Web-reasoning: hard/browsing tasks (WebWalker, HLE, GAIA, BrowseComp)
     if _PROMPT_STYLE == "web_reasoning":
         return WEB_REASONING_PROMPT.format(
             question=question,
             history=history or "(empty, this is the first turn)",
         )
 
-    # Default: react_simple. Route by dataset source — Search-R1 for hotpotqa/2wiki, ReAct for the rest.
     source = str(question_id).split('-')[0].lower()
     if source in ["hotpotqa", "2wikimultihopqa"]:
         return SEARCH_R1_PROMPT.format(
@@ -242,7 +221,6 @@ def _format_history_react(query: str, result: str) -> str:
 
 def format_history_by_source(question_id: str, query: str, result: str) -> str:
     """Choose history formatting based on prompt style + source."""
-    # Web-reasoning uses <information> tag convention
     if _PROMPT_STYLE == "web_reasoning":
         return _format_history_r1(query, result)
     source = str(question_id).split('-')[0].lower()
@@ -271,8 +249,6 @@ async def generate_pool(
             temperature=1.0,
         )
     except Exception:
-        # Pool generation failed; fall back to question-derived variants so the
-        # rollout can still proceed (gracefully degrades to near-naive parallel).
         text, p_tok, o_tok = "", 0, 0
     queries = _parse_pool_response(text, o)
     while len(queries) < o:
@@ -297,9 +273,8 @@ def _pick_most_diverse_from_pool(pool: List[str], prior: List[str]) -> str:
         return pool[0]
     best, best_score = pool[0], -1.0
     for cand in pool:
-        # min similarity to priors → want to MAXIMIZE (1 - min_sim) => MINIMIZE max_sim
         max_sim = max(_jaccard_sim_tokens(cand, p) for p in prior)
-        score = 1.0 - max_sim  # distance to closest prior
+        score = 1.0 - max_sim
         if score > best_score:
             best_score = score
             best = cand
@@ -336,19 +311,18 @@ async def run_single_rollout(
     """
     history_str = ""
     final_answer = None
-    last_answer_candidate = None  # best-effort extraction from any turn
+    last_answer_candidate = None
     turn_logs = []
     full_responses = []
     total_prompt = 0
     total_completion = 0
     search_calls = 0
     qid = question_id or ""
-    prior_queries: List[str] = []  # for oversample-diverse-from-prior (within this thread)
+    prior_queries: List[str] = []
 
     for turn in range(1, max_turns + 1):
-        # Turn 1 with injected query: skip LLM call, go straight to search
         if turn == 1 and initial_query is not None:
-            sr = await web_search(initial_query, max_chars=4000) # Increased max_chars
+            sr = await web_search(initial_query, max_chars=4000)
             history_str = format_history_by_source(qid, initial_query, sr)
             search_calls += 1
             prior_queries.append(initial_query)
@@ -360,7 +334,6 @@ async def run_single_rollout(
             })
             continue
 
-        # Normal turn: call LLM
         prompt = get_prompt_for_question(qid, question, turn, max_turns, history_str)
         if turn == 1 and initial_query is None:
             temp = react_temp_first
@@ -375,13 +348,10 @@ async def run_single_rollout(
                 seed=(rollout_seed + turn) % SEED_MAX,
             )
         except Exception as e:
-            # Per-turn call failed after retries. Salvage: return any answer we found.
             turn_logs.append({"turn": turn, "error": f"{type(e).__name__}: {str(e)[:200]}"})
             break
         total_prompt += p_tok
         total_completion += o_tok
-        
-        # Log EVERYTHING
         full_responses.append({
             "turn": turn,
             "prompt": prompt,
@@ -390,7 +360,6 @@ async def run_single_rollout(
             "temp": temp
         })
 
-        # Per-turn answer extraction: tagged <answer> and/or fallback candidate
         is_last = turn == max_turns
         tagged_answer, candidate = _extract_answer_candidate(response, is_last_turn=is_last)
         if candidate:
@@ -406,10 +375,6 @@ async def run_single_rollout(
             })
             break
 
-        # Web-reasoning: model may output <summary>...</summary> to compress history.
-        # Replace history_str with the summary (tag-wrapped so the prompt remains
-        # structurally similar). If the model used <summary> in its output, it's
-        # NOT also a search or answer — we continue to the next turn with the compressed history.
         summary = _extract_tag(response, "summary")
         if summary and not _extract_tag(response, "search") and not tagged_answer:
             history_str = f"<summary>{summary}</summary>"
@@ -420,13 +385,8 @@ async def run_single_rollout(
             })
             continue
 
-        # Check for search
         query = _extract_tag(response, "search")
         if query:
-            # Oversample override: for turns 2..N (N=oversample_until_turn), replace
-            # the LLM's chosen query with a pool-picked one that maximizes Jaccard
-            # distance from this thread's prior queries. Turn 1 is handled earlier
-            # via initial_query injection (from cross-thread selection in run_diversity_parallel).
             overridden = False
             if turn > 1 and turn <= oversample_until_turn:
                 try:
@@ -440,7 +400,7 @@ async def run_single_rollout(
                         query = picked
                         overridden = True
                 except Exception:
-                    pass  # fall back to LLM's query if pool gen fails
+                    pass
             sr = await web_search(query, max_chars=4000)
             new_history = format_history_by_source(qid, query, sr)
             history_str = (history_str + "\n" + new_history).strip()
@@ -478,14 +438,7 @@ async def run_single_rollout(
     }
 
 
-# ---------------------------------------------------------------------------
-# Condition 1: SEQUENTIAL
-# ---------------------------------------------------------------------------
-
 class SequentialMethod(BaseMethod):
-    """
-    SEQUENTIAL: 200 rollouts total (8 per question). No oversampling, free turn-1.
-    """
 
     async def run_question(
         self,
@@ -495,8 +448,8 @@ class SequentialMethod(BaseMethod):
         pbar: Optional[object] = None,
         run_seed: int = 0,
     ) -> MethodResult:
-        k = self.config.k  # 8 rollouts per question
-        max_turns = self.config.n  # 12
+        k = self.config.k
+        max_turns = self.config.n
 
         if pbar:
             pbar.set_description(f"Q{question_id}: SEQUENTIAL")
@@ -519,7 +472,6 @@ class SequentialMethod(BaseMethod):
             r["rollout_idx"] = i
             all_rollout_results.append(r)
 
-        # Aggregate
         n_correct = sum(r["is_correct"] for r in all_rollout_results)
         any_correct = n_correct > 0
         first_correct = next((r["answer"] for r in all_rollout_results if r["is_correct"]), "")
@@ -548,16 +500,7 @@ class SequentialMethod(BaseMethod):
         return result
 
 
-# ---------------------------------------------------------------------------
-# Diversity Parallel: one pool of o, select 4 seeds, run 4 threads
-# ---------------------------------------------------------------------------
-
 class DiversityParallelMethod(BaseMethod):
-    """
-    At Turn 1: sample o candidate queries at temperature=1.0. Greedy max-min selection
-    (Jaccard or dense embeddings) to pick 4 seeds. Run 4 independent ReAct threads
-    from those seeds for 12 turns each.
-    """
 
     async def run_question(
         self,
@@ -567,10 +510,10 @@ class DiversityParallelMethod(BaseMethod):
         pbar: Optional[object] = None,
         run_seed: int = 0,
     ) -> MethodResult:
-        k = self.config.k  # 4 threads
-        pool_size = self.config.o  # 16, 32, 48, or 64
-        max_turns = self.config.n  # 12
-        selection_method = self.config.diversity_method  # "jaccard" or "dense"
+        k = self.config.k
+        pool_size = self.config.o
+        max_turns = self.config.n
+        selection_method = self.config.diversity_method
 
         if pbar:
             pbar.set_description(f"Q{question_id}: DIV-PAR o={pool_size} {selection_method}")
@@ -630,15 +573,7 @@ class DiversityParallelMethod(BaseMethod):
         return result
 
 
-# ---------------------------------------------------------------------------
-# Condition 2: DIVERSITY-1 (per-rollout pool, select 1)
-# ---------------------------------------------------------------------------
-
 class Diversity1Method(BaseMethod):
-    """
-    DIVERSITY-1: 200 rollouts (8 per question). At turn-1 only: oversample o, DPP select 1, use as turn-1.
-    o from config (16, 48, or 64); method jaccard or dpp_tfidf.
-    """
 
     async def run_question(
         self,
@@ -648,10 +583,10 @@ class Diversity1Method(BaseMethod):
         pbar: Optional[object] = None,
         run_seed: int = 0,
     ) -> MethodResult:
-        k = self.config.k  # 8 rollouts per question
-        pool_size = self.config.o  # 16, 48, or 64
-        max_turns = self.config.n  # 12
-        selection_method = self.config.diversity_method  # "jaccard" or "dpp_tfidf"
+        k = self.config.k
+        pool_size = self.config.o
+        max_turns = self.config.n
+        selection_method = self.config.diversity_method
 
         all_rollout_results = []
         total_pool_prompt = 0
@@ -680,7 +615,6 @@ class Diversity1Method(BaseMethod):
             r["injected_query"] = turn1_query
             all_rollout_results.append(r)
 
-        # Aggregate
         n_correct = sum(r["is_correct"] for r in all_rollout_results)
         any_correct = n_correct > 0
         first_correct = next((r["answer"] for r in all_rollout_results if r["is_correct"]), "")
@@ -711,10 +645,6 @@ class Diversity1Method(BaseMethod):
         return result
 
 
-# ---------------------------------------------------------------------------
-# Condition 3: DIVERSITY-ALL
-# ---------------------------------------------------------------------------
-
 async def run_single_rollout_diversity_all(
     model: str,
     question: str,
@@ -723,7 +653,7 @@ async def run_single_rollout_diversity_all(
     pool_size: int,
     selection_method: str,
     rollout_seed: int,
-    question_id: str, # Add question_id
+    question_id: str,
 ) -> Dict[str, Any]:
     """
     One rollout for DIVERSITY-ALL: at every turn, generate pool_size candidates,
@@ -756,7 +686,6 @@ async def run_single_rollout_diversity_all(
                 "search_result": sr
             })
 
-    # Final answer: one LLM call with full history
     prompt = get_prompt_for_question(question_id, question, max_turns, max_turns, history_str)
     if "answer" not in prompt.lower():
          prompt += "\n\nBased on the above, output your final answer in <answer>...</answer>."
@@ -770,12 +699,10 @@ async def run_single_rollout_diversity_all(
             seed=(rollout_seed + 999) % SEED_MAX,
         )
     except Exception:
-        # Final-answer call failed — fall back to the best evidence we have
         response = ""
         p_tok, o_tok = 0, 0
     total_react_prompt += p_tok
     total_react_completion += o_tok
-    
     full_responses.append({
         "type": "final_answer",
         "prompt": prompt,
@@ -802,9 +729,6 @@ async def run_single_rollout_diversity_all(
 
 
 class DiversityAllMethod(BaseMethod):
-    """
-    DIVERSITY-ALL: 200 rollouts (8 per question). At every turn: oversample o=64, DPP select 1.
-    """
 
     async def run_question(
         self,
@@ -814,10 +738,10 @@ class DiversityAllMethod(BaseMethod):
         pbar: Optional[object] = None,
         run_seed: int = 0,
     ) -> MethodResult:
-        k = self.config.k  # 8 rollouts per question
-        pool_size = self.config.o  # 64
-        max_turns = self.config.n  # 12
-        selection_method = self.config.diversity_method  # dpp_tfidf
+        k = self.config.k
+        pool_size = self.config.o
+        max_turns = self.config.n
+        selection_method = self.config.diversity_method
 
         all_rollout_results = []
         for rollout_idx in range(k):

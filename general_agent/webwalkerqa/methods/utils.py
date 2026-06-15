@@ -1,12 +1,3 @@
-"""
-Diversity utilities for query selection.
-
-Provides:
-- Jaccard similarity/distance
-- Dense embeddings (sentence-transformers/all-MiniLM-L6-v2) cosine distance
-- Greedy max-min diverse subset selection
-"""
-
 import re
 from typing import List, Set
 import numpy as np
@@ -46,10 +37,8 @@ def compute_jaccard_distance_matrix(queries: List[str]) -> np.ndarray:
     return matrix
 
 
-# Default model for dense diversity (used by select_diverse_queries with method="dense")
 DEFAULT_EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-# Lazy singleton for MiniLM (loaded once per process)
 _minilm_model = None
 
 
@@ -58,7 +47,6 @@ def _get_minilm():
     global _minilm_model
     if _minilm_model is None:
         import logging
-        # Suppress the "UNEXPECTED" warning from sentence-transformers/transformers
         logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
         from sentence_transformers import SentenceTransformer
         _minilm_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
@@ -72,7 +60,6 @@ def compute_dense_distance_matrix(queries: List[str]) -> np.ndarray:
     """
     model = _get_minilm()
     embeddings = model.encode(queries, convert_to_numpy=True)
-    # Cosine similarity between rows
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     emb_norm = embeddings / norms

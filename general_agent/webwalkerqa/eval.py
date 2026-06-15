@@ -1,8 +1,3 @@
-"""
-Minimal eval helpers for scaling experiments.
-Provides exact_match for pass@k computation (exact string match after normalization).
-"""
-
 import re
 from typing import Union
 

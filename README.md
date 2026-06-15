@@ -87,10 +87,8 @@ Across five open-weight models and eight benchmarks, DivInit improves pass@4 by 
 | Path | Description |
 |------|-------------|
 | `general_agent/webwalkerqa/` | Core agent, DivInit method, evaluation |
-| `general_agent/data/main_table/` | 8 benchmark datasets |
-| `results/main_table/` | Main table results |
-| `results/ablations/` | Pool size, oversample, temperature ablations |
-| `paper_assets/figures/` | All figures with generation scripts |
+| `general_agent/data/main_table/` | 8 benchmark datasets (`.json`) |
+| `paper_assets/figures/` | Paper figures with generation scripts |
 | `AggAgent/` | AggAgent submodule (Lee et al., 2026) |
 
 ## Getting Started
@@ -108,18 +106,32 @@ SERPER_API_KEY=...
 ```
 
 ```bash
+# multi-hop QA (HotpotQA, MuSiQue, 2WikiMHQA, Bamboogle, FRAMES)
 python -m webwalkerqa.run.run_main_table \
   --model openai/gpt-4o-mini \
   --dataset data/main_table/hotpotqa.json \
   --condition diversity_parallel \
+  --k 4 --pool-size 16 --max-turns-par 8 \
+  --prompt-style react_simple \
+  --output-dir ../results/my_run
+
+# open-web (GAIA, HLE, WebWalker) — add SERPER_API_KEY to .env
+python -m webwalkerqa.run.run_main_table \
+  --model openai/gpt-4o-mini \
+  --dataset data/main_table/gaia.json \
+  --condition diversity_parallel \
+  --k 4 --pool-size 16 --max-turns-par 8 \
+  --prompt-style web_reasoning \
   --output-dir ../results/my_run
 ```
 
 ## Reproducing Results
 
-**Open models** (Qwen3, Gemma3) — serve via vLLM first, then run:
+Available conditions: `diversity_parallel` (DivInit), `naive_parallel` (baseline), `sequential`.
+
+**Open models** (Qwen3, Gemma3) — start a vLLM server, then point `--api-base` at it:
 ```bash
-vllm serve Qwen/Qwen3-8B --port 8003 --enable-prefix-caching --dtype auto
+vllm serve Qwen/Qwen3-8B --port 8003 --enable-prefix-caching --dtype auto --max-model-len 32768
 
 cd general_agent
 python -m webwalkerqa.run.run_main_table \
@@ -127,22 +139,27 @@ python -m webwalkerqa.run.run_main_table \
   --api-base http://localhost:8003/v1 \
   --dataset data/main_table/hotpotqa.json \
   --condition diversity_parallel \
+  --k 4 --pool-size 16 --max-turns-par 8 \
+  --prompt-style react_simple \
   --output-dir ../results/my_run
 ```
 
-**Closed models** (GPT-4o-mini, Gemini):
+**Closed models** (GPT-4o-mini, Gemini) — set `OPENAI_API_KEY` / `GEMINI_API_KEY` in `.env`:
 ```bash
 cd general_agent
 python -m webwalkerqa.run.run_main_table \
   --model openai/gpt-4o-mini \
   --dataset data/main_table/hotpotqa.json \
   --condition diversity_parallel \
+  --k 4 --pool-size 16 --max-turns-par 8 \
+  --prompt-style react_simple \
   --output-dir ../results/my_run
 ```
 
 **Aggregate results:**
 ```bash
-python -m webwalkerqa.scripts.aggregate_results --results-dir ../results
+cd general_agent
+python -m webwalkerqa.scripts.aggregate_results --results-dir ../results/my_run
 ```
 
 ## Citation

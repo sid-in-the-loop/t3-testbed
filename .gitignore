@@ -1,238 +1,29 @@
-/deepresearch_llm_modeling/trajectories
-/general_agent/checkpoints
-/general_agent/serper_time_log.txt
-general_agent/data/
-
-# ==========================================
-# 🔴 Sensitive files - API Keys (must be excluded)
-# ==========================================
+# API keys
 .env
 .env.*
 *.env
-keys.env
-api_key
-**/api_key
-**/api_keys
-*_key
-*_keys
-!.env.example
-!.env.template
-!.env.sample
 
-# ==========================================
-# Python related
-# ==========================================
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
 *.egg-info/
-*.egg
 .venv/
 venv/
-env/
-.eggs/
 build/
 dist/
-develop-eggs/
-downloads/
-eggs/
-wheels/
-.installed.cfg
 
-# ==========================================
-# Node.js related
-# ==========================================
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-package-lock.json
-
-# ==========================================
-# Results, logs, and cache
-# ==========================================
+# Results (28 GB, not tracked)
 results/
-results_archive/
-archive/
 logs/
-logs_old/
-outputs/
+
+# System
+.DS_Store
+*.swp
+*.tmp
 *.log
 *.out
 *.err
-*.db
-*.sqlite
-cache/
-caches/
-.cache/
 
-# ==========================================
-# Large data files
-# ==========================================
-*.RData
-*.mp4
-*.tar.gz
-*.zip
-**/private_test.txt
-
-# Tau2-Bench results and submissions
-tau2-bench/data/tau2/results/
-tau2-bench/web/leaderboard/public/submissions/
-
-# DeepResearch evaluation data
-deepresearch_llm_modeling/evaluation/
-benchmarks/deepresearch_llm_modeling/test_files/
-
-# MCP-Bench large data
-mcp-bench/mcp_servers/medcalc/MedCalcBench/dataset/
-
-# ==========================================
-# System and IDE
-# ==========================================
-.DS_Store
-Thumbs.db
-.idea/
-*.swp
-*.swo
-*~
-.ipynb_checkpoints/
-
-# ==========================================
-# Other temporary files
-# ==========================================
-*.tmp
-*.temp
-*.bak
-
-# ==========================================
-# Test reports
-# ==========================================
-mcp_server_test.log
-mcp_test_summary.txt
-mcp_test_detailed_report.json
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-htmlcov/
-.coverage
-*.cover
-
-# ==========================================
-# Large datasets - do not upload
-# ==========================================
-terminal-bench/dataset/
-all_in_one/data/test/mathhay_documents.json
-benchmarks/MathHay/analysis/
-benchmarks/MathHay/assets/
-benchmarks/mcp-bench/cache_old/
-benchmarks/mcp-bench/images/
-benchmarks/mcp-bench/tasks/
-benchmarks/mcp-bench/ANALYSIS_README.md
-benchmarks/mcp-bench/analyze_all_results.py
-benchmarks/mcp-bench/analyze_mcp_results.py
-benchmarks/mcp-bench/calculate_passk.py
-benchmarks/mcp-bench/calculate_sequential_scores.py
-benchmarks/mcp-bench/calculate_token_cost.py
-benchmarks/mcp-bench/CONTEXT_BUDGET_USAGE.md
-benchmarks/mcp-bench/mcp_servers_info.md
-benchmarks/mcp-bench/MERGE_RESULTS_README.md
-benchmarks/mcp-bench/merge_server_results.py
-benchmarks/mcp-bench/passk_gemini.json
-benchmarks/mcp-bench/passk_oss.json
-benchmarks/mcp-bench/passk_qwen.json
-benchmarks/mcp-bench/mcp_servers_info.json
-benchmarks/mcp-bench/TEMPERATURE_PARAMETER_FLOW.md
-benchmarks/mcp-bench/test_passk_mcp.json
-benchmarks/mcp-bench/update_all_json.py
-benchmarks/mcp-bench/batch_merge_all_models.sh
-benchmarks/tau2-bench/data/
-benchmarks/tau2-bench/figs/
-benchmarks/tau2-bench/scripts/
-benchmarks/tau2-bench/ANALYSIS_README.md
-benchmarks/tau2-bench/analysis_results.json
-benchmarks/tau2-bench/ANALYZE_MULTI_TRIAL.md
-benchmarks/tau2-bench/analyze_results_multi_trial.py
-benchmarks/tau2-bench/analyze_results.py
-benchmarks/tau2-bench/AUTOMATION_GUIDE.md
-benchmarks/tau2-bench/calculate_passk.py
-benchmarks/tau2-bench/CHANGELOG.md
-benchmarks/tau2-bench/cnt_test.py
-benchmarks/tau2-bench/cost_analysis.py
-benchmarks/tau2-bench/MODIFICATION_REPORT.md
-benchmarks/tau2-bench/PASSK_CALCULATION.md
-benchmarks/tau2-bench/prompt/
-benchmarks/tau2-bench/RELEASE_NOTES.md
-benchmarks/tau2-bench/stress_test.sh
-benchmarks/tau2-bench/test_multi_trial_analysis_deepseek.json
-benchmarks/tau2-bench/test_multi_trial_analysis_gemini.json
-benchmarks/tau2-bench/test_multi_trial_analysis_next.json
-benchmarks/tau2-bench/test_multi_trial_analysis_oss.json
-benchmarks/tau2-bench/test_multi_trial_analysis_qwen.json
-benchmarks/tau2-bench/test_multi_trial_analysis_v2.json
-benchmarks/tau2-bench/test_passk_results_dpsk.json
-benchmarks/tau2-bench/test_passk_results_gemini.json
-benchmarks/tau2-bench/test_passk_results_next.json
-benchmarks/tau2-bench/test_passk_results_oss.json
-benchmarks/tau2-bench/test_passk_results_qwen.json
-benchmarks/tau2-bench/test_passk_results.json
-benchmarks/tau2-bench/test_tool_name_sanitization.py
-benchmarks/tau2-bench/VERSIONING.md
-
-# ==========================================
-# Local test scripts - do not upload
-# ==========================================
-MathHay/scripts/main_table/test_local_*.sh
-
-# ==========================================
-# Project-level ignores
-# ==========================================
-todolist/
-environment_one.yaml
-
-# ==========================================
-# general_agent directory - only keep source folder and run.py
-# ==========================================
-# Ignore all content under general_agent
-general_agent/*
-# But keep source folder, run.py, and setup files
-!general_agent/source/
-!general_agent/source/**
-!general_agent/run.py
-!general_agent/README.md
-!general_agent/SCALING_EXPERIMENT.md
-!general_agent/.env-example
-!general_agent/pyproject.toml
-!general_agent/requirements.txt
-!general_agent/environment.yml
-!general_agent/setup.sh
-# Keep WebWalkerQA T³ PoC module
-!general_agent/webwalkerqa/
-!general_agent/webwalkerqa/**
-# Re-exclude pycache within webwalkerqa (negation above would un-ignore it)
-general_agent/webwalkerqa/**/__pycache__/
-general_agent/webwalkerqa/__pycache__/
-# Keep specific data files (benchmark tasks)
-!general_agent/data/
-!general_agent/data/mathhay_benchmark.json
-!general_agent/data/mathhay_documents.json
-!general_agent/data/mcpbench_benchmark.json
-!general_agent/data/search_benchmark.json
-!general_agent/data/swebench_test_50.json
-!general_agent/data/tau2bench_benchmark.json
-!general_agent/data/terminalbench_benchmark.json
-# Keep traces folder (selected traces for publication)
-!general_agent/traces/
-!general_agent/traces/**
-# Keep scripts (T3 experiment pipeline)
-!general_agent/scripts/
-!general_agent/scripts/**
-# Keep HOW-TO doc
-!general_agent/HOW-TO-VLLM.md
-
-# But still exclude cache/compiled artifacts (the !general_agent/source/** above would "un-ignore" them)
-general_agent/source/**/__pycache__/
-general_agent/source/**/*.py[cod]
-general_agent/source/**/*$py.class
+# Repo-specific
 main-fig.pdf
+general_agent/data/
